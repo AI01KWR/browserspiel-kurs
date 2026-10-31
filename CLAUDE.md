@@ -78,8 +78,10 @@ erscheinen bei `SPAWN_Z = -130` im Nebel und werden hinter der Kamera aufgeräum
   (Wunsch: nicht mal sehr viele und dann gar keine). Beim Start liegen schon Reihen alle
   16 Einheiten (von z = -40 bis zum Spawn-Punkt). Zuletzt auf Wunsch „ganz wenig weniger“
   (vorher 11–15).
-- Autolicht: SpotLights Stärke 700, decay 1.2, Winkel 0.42 – sichtbar, aber nicht grell
-  (110 war zu schwach, man sah gar kein Licht mehr; 220 mit decay 2 war zu stark).
+- Autolicht: SpotLights Stärke 3.5 mit **decay 0** (keine Abschwächung), Reichweite 55,
+  Winkel 0.42. Mit Abschwächung wurden nahe Hindernisse so hell angestrahlt, dass man sie
+  durch den Bloom nicht mehr erkannte. Hindernis-Materialien sind deshalb auch eher matt
+  (wenig metalness), Betonsperre und Streifen leicht abgedunkelt.
 - Umgefahrene Zombies fliegen comicartig weg, grüne Teilchen, kein Blut.
 - Münze: +10 Punkte, +4 Nitro. Zombie: +5 Punkte, +3 Nitro.
 - Rote Werkzeugkiste: +25 Leben.

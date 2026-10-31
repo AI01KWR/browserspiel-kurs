@@ -828,13 +828,13 @@ const MAT = {
   wood: std(0xffffff, { map: TEX.wood, roughness: 0.9 }),
   woodDark: std(0x5a3a22, { roughness: 0.9 }),
   crate: std(0xffffff, { map: TEX.crate, roughness: 0.85 }),
-  rust: [0xffffff, 0x9aaab0, 0x8a9a6a, 0xb08070].map(c => std(c, { map: TEX.rust, roughness: 0.8, metalness: 0.45 })),
-  concrete: std(0xffffff, { map: TEX.concrete, roughness: 0.95 }),
-  stripes: std(0xffffff, { map: TEX.stripes, roughness: 0.8 }),
-  ramp: std(0xc08a10, { roughness: 0.5, metalness: 0.4 }),
-  rampTop: std(0xffffff, { map: TEX.ramp, roughness: 0.6, metalness: 0.2 }),
+  rust: [0xffffff, 0x9aaab0, 0x8a9a6a, 0xb08070].map(c => std(c, { map: TEX.rust, roughness: 0.85, metalness: 0.2 })),
+  concrete: std(0xbdbdbd, { map: TEX.concrete, roughness: 0.95 }),
+  stripes: std(0xb0b0b0, { map: TEX.stripes, roughness: 0.85 }),
+  ramp: std(0xc08a10, { roughness: 0.7, metalness: 0.1 }),
+  rampTop: std(0xffffff, { map: TEX.ramp, roughness: 0.75, metalness: 0 }),
   coin: std(0xffc030, { roughness: 0.25, metalness: 1, emissive: 0x9a6400, envMapIntensity: 2.5 }),
-  kit: std(0xffffff, { map: TEX.kit, roughness: 0.4, metalness: 0.3, emissive: 0x220000 }),
+  kit: std(0xffffff, { map: TEX.kit, roughness: 0.6, metalness: 0.1, emissive: 0x220000 }),
   pole: std(0x2c2c34, { roughness: 0.5, metalness: 0.7 }),
   bark: std(0x3a2a20, { roughness: 1 }),
   curb: std(0x6a6670, { roughness: 0.95 }),
@@ -1445,9 +1445,10 @@ const rarityColor = r => r === 'starter' ? '#ff6a3a' : RARITY[r].color;
 function buildCar(id, withLights) {
   const c = (CAR_BY_ID[id] || CAR_BY_ID.starter).build();
   if (withLights) {
-    // Echte Scheinwerfer (nur im Spiel, nicht im Showroom). Sichtbar, aber nicht grell.
+    // Echte Scheinwerfer (nur im Spiel, nicht im Showroom). Ohne Abschwächung (decay 0),
+    // damit nahe Hindernisse nicht überstrahlt werden und man sie gut erkennt.
     [-0.6, 0.6].forEach(x => {
-      const sp = new THREE.SpotLight(0xfff2cc, 700, 60, 0.42, 0.6, 1.2);
+      const sp = new THREE.SpotLight(0xfff2cc, 3.5, 55, 0.42, 0.6, 0);
       sp.position.set(x, 0.9, -1.9);
       sp.target.position.set(x * 1.6, 0, -20);
       c.root.add(sp, sp.target);
