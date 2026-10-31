@@ -18,12 +18,20 @@ Keine Figuren, Namen oder Grafiken von Subway Surfers verwenden.
 ## Technik
 - Nur statische Dateien für GitHub Pages: kein Server, kein Build-Schritt.
 - Alles steckt in **einer** Datei: `index.html`.
-- Three.js **r128** über cdnjs: `https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js`
-- Bibliotheken nur über `<script>`-Tags mit fester Versionsnummer.
+- Three.js **0.169.0** als ES-Modul über eine **Import-Map** von jsdelivr
+  (`three` und `three/addons/` für Zusatzmodule). Das Spiel-Script ist `<script type="module">`.
+  Weil Module keine globalen Variablen haben, gibt es zum Testen `window.ZH`
+  (state, car, startGame, damage …).
+- Bibliotheken nur mit fester Versionsnummer, keine Build-Tools.
+- Grafik: sRGB-Ausgabe, ACES-Filmic-Tone-Mapping, eigene gemalte Nacht-Environment-Map
+  (PMREM), `MeshStandardMaterial` überall (Autolack: `MeshPhysicalMaterial` mit Klarlack).
+  Lichtstärken sind physikalisch (Spot/Point mit decay 2), daher große Zahlen.
+  Canvas-Texturen mit Farben brauchen `colorSpace = SRGBColorSpace` (macht `canvasTex()`).
 - Alle Texturen werden zur Laufzeit auf Canvas gezeichnet, es gibt keine Bilddateien.
 - Schrift „Bungee“ (Google Fonts) für Titel und Zahlen.
 - localStorage immer über das Objekt `Store` (mit try/catch).
-- Comic-Look über `MeshToonMaterial` mit eigener `gradientMap` (Helfer `toon()`).
+- Grafik-Ziel (Branch `grafik`): möglichst realistisch Richtung GTA, Gameplay bleibt gleich.
+  Materialien über Helfer `std()`.
 - Auf Handys (`LOW_Q`) wird Qualität gespart: kleinere Schattenkarte, weniger Teilchen,
   keine Feuer-Lichter, kein Antialiasing.
 

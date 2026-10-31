@@ -204,9 +204,17 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script>
-'use strict';
+<!-- Three.js als Modul über eine Import-Map (feste Version, kein Build-Schritt nötig) -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
 
 // =====================================================================
 //  EINSTELLUNGEN – bestimmen das Spielgefühl.
@@ -287,6 +295,10 @@ renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOW_Q ? 1.5 : 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = LOW_Q ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+// Richtige Farbdarstellung und filmischer Look
+renderer.outputColorSpace = THREE.SRGBColorSpace;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.1;
 document.getElementById('game').appendChild(renderer.domElement);
 
 const scene = new THREE.Scene();
@@ -296,9 +308,10 @@ scene.fog = new THREE.Fog(FOG_COLOR, 28, 135);
 
 const camera = new THREE.PerspectiveCamera(64, innerWidth / innerHeight, 0.1, 700);
 
-scene.add(new THREE.HemisphereLight(0x8a96d0, 0x2a1418, 0.62));
+// Lichtstärken sind physikalisch (neuere Three.js-Versionen), daher größere Zahlen als früher
+scene.add(new THREE.HemisphereLight(0x8a96d0, 0x2a1418, 1.4));
 // Mondlicht mit Schatten
-const moonLight = new THREE.DirectionalLight(0xb4c0ff, 0.65);
+const moonLight = new THREE.DirectionalLight(0xb4c0ff, 1.8);
 moonLight.position.set(-18, 30, -6);
 moonLight.target.position.set(0, 0, -10);
 moonLight.castShadow = true;
@@ -307,7 +320,7 @@ Object.assign(moonLight.shadow.camera, { left: -22, right: 22, top: 30, bottom: 
 moonLight.shadow.bias = -0.0006;
 scene.add(moonLight, moonLight.target);
 // Rötlicher Schein von der brennenden Stadt am Horizont
-const glowLight = new THREE.DirectionalLight(0xff6a3a, 0.3);
+const glowLight = new THREE.DirectionalLight(0xff6a3a, 0.9);
 glowLight.position.set(0, 6, -60);
 scene.add(glowLight);
 
@@ -324,6 +337,7 @@ function canvasTex(w, h, draw) {
   const t = new THREE.CanvasTexture(makeCanvas(w, h, draw));
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = 4;
+  t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 function speckle(g, w, h, count, colors, sMin, sMax) {
@@ -555,13 +569,42 @@ TEX.fire = canvasTex(64, 128, (g, w, h) => {
   g.fill();
 });
 
-// Kleine Verlaufstextur für den Comic-Look (harte Schattenstufen)
-const gradientMap = new THREE.CanvasTexture(makeCanvas(4, 1, g => {
-  [70, 140, 200, 255].forEach((v, i) => { g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(i, 0, 1, 1); });
-}));
-gradientMap.minFilter = gradientMap.magFilter = THREE.NearestFilter;
-gradientMap.generateMipmaps = false;
-const toon = (color, opts = {}) => new THREE.MeshToonMaterial(Object.assign({ color, gradientMap }, opts));
+// =====================================================================
+//  UMGEBUNGS-BELEUCHTUNG (Environment Map)
+//  Ein gemaltes Nacht-Panorama: dunkler Himmel, glühender Horizont, viele
+//  erleuchtete Fenster und Laternen. Lack, Metall und Glas spiegeln das.
+// =====================================================================
+{
+  const envTex = new THREE.CanvasTexture(makeCanvas(1024, 512, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, '#05060f');
+    gr.addColorStop(0.4, '#1a1430');
+    gr.addColorStop(0.5, '#a0401c');
+    gr.addColorStop(0.56, '#2a1418');
+    gr.addColorStop(1, '#0a0808');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 900; i++) {           // Fenster der Stadt rundherum
+      g.fillStyle = pick(['#ffcf6a', '#ffb347', '#ffe9a8', '#ff8a3a']);
+      g.fillRect(rand(0, w), rand(h * 0.3, h * 0.55), rand(2, 5), rand(2, 5));
+    }
+    for (let i = 0; i < 14; i++) {            // Laternen und Brände
+      const x = rand(0, w), y = rand(h * 0.25, h * 0.5), r = rand(10, 30);
+      const l = g.createRadialGradient(x, y, 0, x, y, r);
+      l.addColorStop(0, 'rgba(255,220,150,1)'); l.addColorStop(1, 'rgba(255,140,60,0)');
+      g.fillStyle = l; g.fillRect(x - r, y - r, r * 2, r * 2);
+    }
+  }));
+  envTex.mapping = THREE.EquirectangularReflectionMapping;
+  envTex.colorSpace = THREE.SRGBColorSpace;
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromEquirectangular(envTex).texture;
+  scene.environmentIntensity = 0.9;
+  envTex.dispose();
+  pmrem.dispose();
+}
+
+// Realistische Materialien (PBR): roughness = wie rau, metalness = wie metallisch
+const std = (color, opts = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.85, metalness: 0 }, opts));
 const basic = (color, opts = {}) => new THREE.MeshBasicMaterial(Object.assign({ color }, opts));
 const additive = { transparent: true, blending: THREE.AdditiveBlending, depthWrite: false };
 
@@ -569,38 +612,39 @@ const additive = { transparent: true, blending: THREE.AdditiveBlending, depthWri
 //  MATERIALIEN
 // =====================================================================
 const MAT = {
-  paint: toon(0xd42418),
-  dark: toon(0x26252c),
-  metal: toon(0x9aa3ad),
-  glass: toon(0x22344f, { emissive: 0x08101c }),
-  rubber: toon(0x1a1a1e),
-  rim: toon(0xffffff, { map: TEX.rim }),
+  // Autolack mit Klarlack-Schicht (MeshPhysicalMaterial ist ein erweitertes MeshStandardMaterial)
+  paint: new THREE.MeshPhysicalMaterial({ color: 0xc41a12, metalness: 0.45, roughness: 0.38, clearcoat: 1, clearcoatRoughness: 0.06 }),
+  dark: std(0x26252c, { roughness: 0.6, metalness: 0.3 }),
+  metal: std(0xc0c6ce, { roughness: 0.28, metalness: 1 }),
+  glass: std(0x0c1626, { roughness: 0.05, metalness: 0.9 }),
+  rubber: std(0x18181b, { roughness: 0.95 }),
+  rim: std(0xffffff, { map: TEX.rim, roughness: 0.35, metalness: 0.8 }),
   headlight: basic(0xfff6d0),
   tail: basic(0xff2a1a),
   roofLamp: basic(0xfff2a0),
   flameOuter: basic(0x2a7bff, Object.assign({ opacity: 0.85 }, additive)),
   flameInner: basic(0xbff4ff, Object.assign({ opacity: 0.9 }, additive)),
-  skin: ['#7fae5a', '#93c06a', '#6e9a58', '#a2b86a'].map(c => toon(c)),
-  shirt: ['#5a6e8a', '#8a5a4a', '#6a7a4a', '#7a6a8a', '#a08a5a', '#8a8a8a'].map(c => toon(0xffffff, { map: shirtTex(c) })),
-  pants: ['#3a3a4a', '#4a3a2a', '#2e3a4e', '#4a4a3a'].map(c => toon(c)),
-  shoe: toon(0x2a2018),
-  hair: toon(0x2a2a1a),
+  skin: ['#7fae5a', '#93c06a', '#6e9a58', '#a2b86a'].map(c => std(c, { roughness: 0.7 })),
+  shirt: ['#5a6e8a', '#8a5a4a', '#6a7a4a', '#7a6a8a', '#a08a5a', '#8a8a8a'].map(c => std(0xffffff, { map: shirtTex(c), roughness: 0.95 })),
+  pants: ['#3a3a4a', '#4a3a2a', '#2e3a4e', '#4a4a3a'].map(c => std(c, { roughness: 0.95 })),
+  shoe: std(0x2a2018, { roughness: 0.6 }),
+  hair: std(0x2a2a1a, { roughness: 0.9 }),
   eye: basic(0xff2a10),
-  mouth: toon(0x2a0a0a),
-  wood: toon(0xffffff, { map: TEX.wood }),
-  woodDark: toon(0x5a3a22),
-  crate: toon(0xffffff, { map: TEX.crate }),
-  rust: [toon(0xffffff, { map: TEX.rust }), toon(0x9aaab0, { map: TEX.rust }), toon(0x8a9a6a, { map: TEX.rust }), toon(0xb08070, { map: TEX.rust })],
-  concrete: toon(0xffffff, { map: TEX.concrete }),
-  stripes: toon(0xffffff, { map: TEX.stripes }),
-  ramp: toon(0xc08a10),
-  rampTop: toon(0xffffff, { map: TEX.ramp }),
-  coin: toon(0xffcc22, { emissive: 0x6a4400 }),
-  kit: toon(0xffffff, { map: TEX.kit, emissive: 0x330000 }),
-  pole: toon(0x2c2c34),
-  bark: toon(0x3a2a20),
-  curb: toon(0x6a6670),
-  ground: toon(0x17141a),
+  mouth: std(0x2a0a0a),
+  wood: std(0xffffff, { map: TEX.wood, roughness: 0.9 }),
+  woodDark: std(0x5a3a22, { roughness: 0.9 }),
+  crate: std(0xffffff, { map: TEX.crate, roughness: 0.85 }),
+  rust: [0xffffff, 0x9aaab0, 0x8a9a6a, 0xb08070].map(c => std(c, { map: TEX.rust, roughness: 0.8, metalness: 0.45 })),
+  concrete: std(0xffffff, { map: TEX.concrete, roughness: 0.95 }),
+  stripes: std(0xffffff, { map: TEX.stripes, roughness: 0.8 }),
+  ramp: std(0xc08a10, { roughness: 0.5, metalness: 0.4 }),
+  rampTop: std(0xffffff, { map: TEX.ramp, roughness: 0.6, metalness: 0.2 }),
+  coin: std(0xffc030, { roughness: 0.25, metalness: 1, emissive: 0x9a6400, envMapIntensity: 2.5 }),
+  kit: std(0xffffff, { map: TEX.kit, roughness: 0.4, metalness: 0.3, emissive: 0x220000 }),
+  pole: std(0x2c2c34, { roughness: 0.5, metalness: 0.7 }),
+  bark: std(0x3a2a20, { roughness: 1 }),
+  curb: std(0x6a6670, { roughness: 0.95 }),
+  ground: std(0x17141a, { roughness: 1 }),
   fire: new THREE.SpriteMaterial(Object.assign({ map: TEX.fire, color: 0xffa040 }, additive)),
   goo: [0x7dff3a, 0x4ae020, 0xb4ff6a].map(c => basic(c)),
   gold: [basic(0xffe066), basic(0xffb020)],
@@ -655,6 +699,7 @@ scene.add(skyGroup);
       g.fillRect(rand(0, w), y, s, s);
     }
   }));
+  skyTex.colorSpace = THREE.SRGBColorSpace;
   const sky = new THREE.Mesh(new THREE.SphereGeometry(450, 32, 16),
     new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false }));
   skyGroup.add(sky);
@@ -670,6 +715,7 @@ scene.add(skyGroup);
       g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
     });
   }));
+  moonTex.colorSpace = THREE.SRGBColorSpace;
   const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: moonTex, fog: false, transparent: true, depthWrite: false }));
   moon.scale.set(90, 90, 1);
   moon.position.set(-130, 150, -330);
@@ -701,6 +747,7 @@ scene.add(skyGroup);
       x += bw + rand(0, 6);
     }
   }));
+  skylineTex.colorSpace = THREE.SRGBColorSpace;
   skylineTex.wrapS = THREE.RepeatWrapping;
   skylineTex.repeat.x = 3;
   const skyline = new THREE.Mesh(new THREE.CylinderGeometry(400, 400, 70, 48, 1, true),
@@ -716,7 +763,7 @@ const ROAD_LEN = 240;
 const scrollTextures = [];
 {
   TEX.road.repeat.set(1, ROAD_LEN / ROAD_TILE);
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, ROAD_LEN), toon(0xffffff, { map: TEX.road }));
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, ROAD_LEN), std(0xffffff, { map: TEX.road, roughness: 0.75 }));
   road.rotation.x = -Math.PI / 2;
   road.position.set(0, 0, 20 - ROAD_LEN / 2);
   road.receiveShadow = true;
@@ -725,7 +772,7 @@ const scrollTextures = [];
 
   const WALK_W = 3.2;
   TEX.walk.repeat.set(1, ROAD_LEN / WALK_W);
-  const walkMat = toon(0xffffff, { map: TEX.walk });
+  const walkMat = std(0xffffff, { map: TEX.walk, roughness: 0.9 });
   [-1, 1].forEach(side => {
     const walk = new THREE.Mesh(new THREE.PlaneGeometry(WALK_W, ROAD_LEN), walkMat);
     walk.rotation.x = -Math.PI / 2;
@@ -767,7 +814,7 @@ function placeBuilding(b) {
     const f = pick(FACADES);
     const map = f.map.clone(), emissiveMap = f.emissiveMap.clone();
     map.needsUpdate = emissiveMap.needsUpdate = true;
-    const mesh = new THREE.Mesh(UNIT_BOX, toon(0xffffff, { map, emissiveMap, emissive: 0xffffff }));
+    const mesh = new THREE.Mesh(UNIT_BOX, std(0xffffff, { map, emissiveMap, emissive: 0xffffff, emissiveIntensity: 1.2, roughness: 0.8 }));
     scene.add(mesh);
     const b = { mesh, side, z: 0, len: 0 };
     placeBuilding(b);
@@ -818,7 +865,7 @@ function makeBarrel() {
   }
   g.userData.fires = fires;
   if (!LOW_Q && fireLights.length < 3) {        // nur ein paar echte Lichter, das spart Leistung
-    const l = new THREE.PointLight(0xff7a2a, 1.6, 10, 1.5);
+    const l = new THREE.PointLight(0xff7a2a, 14, 12, 2);
     l.position.y = 1.8; g.add(l); fireLights.push(l);
   }
   return g;
@@ -898,7 +945,7 @@ const carModel = (() => {
   });
   // Echte Scheinwerfer
   [-0.6, 0.6].forEach(x => {
-    const sp = new THREE.SpotLight(0xfff2cc, 2.4, 50, 0.5, 0.45, 1);
+    const sp = new THREE.SpotLight(0xfff2cc, 220, 55, 0.5, 0.45, 2);
     sp.position.set(x, 0.9, -1.9);
     sp.target.position.set(x * 1.6, 0, -20);
     root.add(sp, sp.target);
@@ -1503,7 +1550,7 @@ function updateFx(dt) {
       f.scale.set(0.8 * k, 1.3 * k, 1);
     });
   }
-  fireLights.forEach((l, i) => { l.intensity = 1.4 + Math.sin(clockTime * 11 + i * 2) * 0.3 + Math.random() * 0.3; });
+  fireLights.forEach((l, i) => { l.intensity = 12 + Math.sin(clockTime * 11 + i * 2) * 3 + Math.random() * 3; });
 
   // roter Rand und Wackeln
   state.flash = Math.max(0, state.flash - dt * 2.5);
@@ -1712,6 +1759,9 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
 });
+
+// Nur zum Testen in der Browser-Konsole (Module haben keine globalen Variablen)
+window.ZH = { state, car, active, zombies, startGame, damage, activateNitro, spawnThing, spawnZombie, LANES };
 
 frame();
 </script>
