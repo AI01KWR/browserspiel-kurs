@@ -48,9 +48,9 @@ erscheinen bei `SPAWN_Z = -130` im Nebel und werden hinter der Kamera aufgeräum
 - 100 Leben. Schaden: Zombie 10, Holzzaun 15, Kisten 20, Autowrack 35, Betonsperre 50.
 - Zombies laufen auf das Auto zu und lenken in seine Spur; manche kommen vom Straßenrand,
   manchmal eine Horde aus 2.
-- Zombie-Takt: `(1.0 - Schwierigkeit * 0.45) * zufällig(0.7, 1.3)` Sekunden, erster Zombie
-  nach ca. 1 Sekunde. Horden-Chance `0.25 + Schwierigkeit * 0.15`, Horde = 2 bis 4 Zombies.
-  (Wurde mehrfach angepasst: erst zu viele, dann zu wenige, zuletzt auf Wunsch deutlich mehr.)
+- Zombie-Takt: `(1.5 - Schwierigkeit * 0.65) * zufällig(0.7, 1.3)` Sekunden, erster Zombie
+  nach ca. 1 Sekunde. Horden-Chance `0.18 + Schwierigkeit * 0.12`, Horde = 2 bis 3 Zombies.
+  (Wurde mehrfach angepasst: erst zu viele, dann zu wenige, dann zu viele – jetzt Mittelweg.)
 - Hindernis-Reihen (`spawnPattern`, `spawning`): Abstand `zufällig(10, 16) - Schwierigkeit * 3`
   Einheiten (nach Rampen zusätzlich Platz). 22 % der Reihen sind Rampen, sonst Hindernis-Reihe:
   3 Hindernisse ab Schwierigkeit > 0.4 mit 15 % Chance, sonst 2 mit Chance
