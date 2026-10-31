@@ -78,13 +78,15 @@ erscheinen bei `SPAWN_Z = -130` im Nebel und werden hinter der Kamera aufgeräum
   (Wunsch: nicht mal sehr viele und dann gar keine). Beim Start liegen schon Reihen alle
   16 Einheiten (von z = -40 bis zum Spawn-Punkt). Zuletzt auf Wunsch „ganz wenig weniger“
   (vorher 11–15).
-- Autolicht bewusst gedämpft (SpotLights Stärke 110, leuchtende Lampen schwächer).
+- Autolicht: SpotLights Stärke 700, decay 1.2, Winkel 0.42 – sichtbar, aber nicht grell
+  (110 war zu schwach, man sah gar kein Licht mehr; 220 mit decay 2 war zu stark).
 - Umgefahrene Zombies fliegen comicartig weg, grüne Teilchen, kein Blut.
 - Münze: +10 Punkte, +4 Nitro. Zombie: +5 Punkte, +3 Nitro.
 - Rote Werkzeugkiste: +25 Leben.
 - Springen per Taste oder über gelbe Rampen; im Sprung fliegt man über Hindernisse und
   Zombies. Hinter Rampen stehen oft Hindernisse, darüber Münzen in der Luft.
-- Nitro (Leiste voll): 3,5 s, 1,6-faches Tempo, **halber** Schaden (bewusst nicht unverwundbar).
+- Nitro (Leiste voll): 3,5 s, 1,6-faches Tempo, **unverwundbar** (auf Wunsch geändert, vorher
+  halber Schaden). Hindernisse werden trotzdem durchbrochen, nur ohne Schaden und ohne Abbremsen.
 - Nach Treffer: kurz langsamer, Bildschirm wackelt und blinkt rot.
 - Unter 50 Leben wird das Auto dunkler und raucht, unter 25 stärker. Bei 0 Game Over.
 - Punkte = Strecke + Münzen × 10 + Zombies × 5.
@@ -107,11 +109,11 @@ erscheinen bei `SPAWN_Z = -130` im Nebel und werden hinter der Kamera aufgeräum
   Anzeige im Hauptmenü, im Shop, bei den Upgrades und beim Game Over („+45 Münzen“).
 - Hauptmenü: Losfahren, Garage, Shop, Upgrades, Rangliste.
 - Shop: Kiste für 1000 Münzen. Seltenheiten: Gewöhnlich 60 % (grau), Selten 25 % (blau),
-  Episch 12 % (lila), Legendär 3 % (gold). Doppeltes Auto → Münzen zurück:
-  200 / 400 / 700 / 1000. Animation: Kiste wackelt, springt auf, Auto erscheint und dreht sich.
+  Episch 12 % (lila), Legendär 3 % (gold), Mythisch 0,01 % (pink; dafür Gewöhnlich 59,99 %).
+  Doppeltes Auto → Münzen zurück: 200 / 400 / 700 / 1000 / 5000. Animation: Kiste wackelt, springt auf, Auto erscheint und dreht sich.
 - Autos: Startauto „Zombie-Brecher“ (rot) + Pickup, Alter Kombi, Taxi (gewöhnlich),
   Polizeiauto, Geländewagen (selten), Monstertruck, Panzer-Transporter (episch),
-  Flammen-Muscle-Car (legendär). Alle aus eigenen Bauteilen (keine Modelldateien).
+  Flammen-Muscle-Car (legendär), Phantom-Hoverauto (mythisch, schwebt, Neon). Alle aus eigenen Bauteilen (keine Modelldateien).
   Sie unterscheiden sich **nur im Aussehen**; Zusammenstöße nutzen immer dieselben Maße.
 - Garage (`zombie-highway-garage`: `owned`, `selected`): eigene Autos farbig, fehlende als
   Silhouette mit „?“ und Seltenheit. Das gezeigte Auto dreht sich in der Showroom-Szene.
