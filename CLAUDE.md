@@ -17,7 +17,7 @@ Keine Figuren, Namen oder Grafiken von Subway Surfers verwenden.
 
 ## Technik
 - Nur statische Dateien für GitHub Pages: kein Server, kein Build-Schritt.
-- Alles steckt in **einer** Datei: `index.html`.
+- Alles steckt in **einer** Datei: `index.html` (der Branch `grafik` ist in `main` übernommen).
 - Three.js **0.169.0** als ES-Modul über eine **Import-Map** von jsdelivr
   (`three` und `three/addons/` für Zusatzmodule). Das Spiel-Script ist `<script type="module">`.
   Weil Module keine globalen Variablen haben, gibt es zum Testen `window.ZH`
@@ -47,15 +47,16 @@ Keine Figuren, Namen oder Grafiken von Subway Surfers verwenden.
 
 ## Aufbau von index.html (Reihenfolge im Script)
 1. **EINSTELLUNGEN** – alle Spielwerte als Konstanten ganz oben.
-2. `Store` und `Leaderboard`.
-3. Renderer, Szene, Kamera, Licht (Mond mit Schatten, rötlicher Horizont-Schein).
+2. `Store`, `Leaderboard`, `Wallet` (Münzkonto), `Garage`, `UPGRADES`/`Upgrades`.
+3. Renderer, Szene, Kamera, Licht (Mond mit Schatten), Nachbearbeitung (`composer`, `renderPass`).
 4. Texturen (`TEX`, `facadeTextures`, `shirtTex`) und Materialien (`MAT`).
 5. Himmel (Sterne, Mond, Skyline), Straße/Gehwege, Hochhäuser, Deko am Rand.
-6. Auto (`carModel`), Zombies und Hindernisse (Fabrikfunktionen `make…`, Pool mit `obtain`/`release`).
+6. Autos (`build…`-Funktionen, `CARS`, `RARITY`, `buildCar`, `carModel`, `setPlayerCar`), Zombies und Hindernisse (Fabrikfunktionen `make…`, Pool mit `obtain`/`release`).
 7. Teilchen: Splitter/grüne Teilchen (`spawnBits`), Rauch, Asche.
 8. Spielzustand `state` und `car`, Spielablauf (`startGame`, `damage`, `gameOver` …).
 9. Spawnen (`spawnPattern`, `spawnZombieGroup`), Bewegung und Zusammenstöße.
-10. Hauptschleife `update()`, Menüs/Rangliste, Steuerung.
+10. Hauptschleife `update()`/`frame()`, Menüs/Rangliste, Showroom (`showScene`, Garage, Shop,
+    Kisten-Animation), Upgrades-Fenster, Steuerung.
 
 Die Welt bewegt sich auf das Auto zu (Auto bleibt bei z = 0, fährt nach -z). Neue Dinge
 erscheinen bei `SPAWN_Z = -130` im Nebel und werden hinter der Kamera aufgeräumt.
@@ -69,13 +70,14 @@ erscheinen bei `SPAWN_Z = -130` im Nebel und werden hinter der Kamera aufgeräum
 - Zombie-Takt: `(1.5 - Schwierigkeit * 0.65) * zufällig(0.7, 1.3)` Sekunden, erster Zombie
   nach ca. 1 Sekunde. Horden-Chance `0.18 + Schwierigkeit * 0.12`, Horde = 2 bis 3 Zombies.
   (Wurde mehrfach angepasst: erst zu viele, dann zu wenige, dann zu viele – jetzt Mittelweg.)
-- Hindernis-Reihen (`spawnPattern`, `spawning`): Abstand `zufällig(11, 15) - Schwierigkeit * 3`
+- Hindernis-Reihen (`spawnPattern`, `spawning`): Abstand `zufällig(12, 16) - Schwierigkeit * 3`
   Einheiten (nach Rampen `Tempo * 0.3` extra zum Landen). 22 % der Reihen sind Rampen, sonst
   Hindernis-Reihe mit 1–3 Hindernissen. Der Durchschnitt pro Reihe entspricht den Chancen
   „3 ab Schwierigkeit > 0.4 mit 15 %, sonst 2 mit `0.4 + Schwierigkeit * 0.3`, sonst 1“,
   wird aber über ein Konto (`obstacleCount`, `state.obstacleBudget`) **gleichmäßig verteilt**
   (Wunsch: nicht mal sehr viele und dann gar keine). Beim Start liegen schon Reihen alle
-  16 Einheiten (von z = -40 bis zum Spawn-Punkt).
+  16 Einheiten (von z = -40 bis zum Spawn-Punkt). Zuletzt auf Wunsch „ganz wenig weniger“
+  (vorher 11–15).
 - Autolicht bewusst gedämpft (SpotLights Stärke 110, leuchtende Lampen schwächer).
 - Umgefahrene Zombies fliegen comicartig weg, grüne Teilchen, kein Blut.
 - Münze: +10 Punkte, +4 Nitro. Zombie: +5 Punkte, +3 Nitro.
@@ -100,9 +102,31 @@ erscheinen bei `SPAWN_Z = -130` im Nebel und werden hinter der Kamera aufgeräum
   später eine Online-Rangliste (z. B. Supabase oder Firebase) nur diese zwei Funktionen ersetzt.
   **Vorher mit dem Besitzer besprechen**, wie Schummeln und unpassende Namen verhindert werden.
 
+## Münzen, Shop, Garage, Upgrades (nur Spielmünzen, kein echtes Geld)
+- Nach jeder Fahrt werden die Münzen aufs Konto addiert (`zombie-highway-coins`).
+  Anzeige im Hauptmenü, im Shop, bei den Upgrades und beim Game Over („+45 Münzen“).
+- Hauptmenü: Losfahren, Garage, Shop, Upgrades, Rangliste.
+- Shop: Kiste für 1000 Münzen. Seltenheiten: Gewöhnlich 60 % (grau), Selten 25 % (blau),
+  Episch 12 % (lila), Legendär 3 % (gold). Doppeltes Auto → Münzen zurück:
+  200 / 400 / 700 / 1000. Animation: Kiste wackelt, springt auf, Auto erscheint und dreht sich.
+- Autos: Startauto „Zombie-Brecher“ (rot) + Pickup, Alter Kombi, Taxi (gewöhnlich),
+  Polizeiauto, Geländewagen (selten), Monstertruck, Panzer-Transporter (episch),
+  Flammen-Muscle-Car (legendär). Alle aus eigenen Bauteilen (keine Modelldateien).
+  Sie unterscheiden sich **nur im Aussehen**; Zusammenstöße nutzen immer dieselben Maße.
+- Garage (`zombie-highway-garage`: `owned`, `selected`): eigene Autos farbig, fehlende als
+  Silhouette mit „?“ und Seltenheit. Das gezeigte Auto dreht sich in der Showroom-Szene.
+- Showroom: eigene Szene `showScene`, wird über denselben Composer gezeichnet
+  (`renderPass.scene` wird umgeschaltet). Kamera-Abstand passt sich dem Hochformat an.
+- Upgrades (`zombie-highway-upgrades`), je 3 Stufen:
+  Panzerung −5 % Schaden/Stufe (300/600/1000), Rammbügel −2 Zombie-Schaden/Stufe
+  (250/500/800), Nitro-Tank +0,5 s/Stufe (300/600/1000), Werkzeugkasten +5 Leben pro
+  Werkzeugkiste/Stufe (200/400/700). Umsetzung in `damageFor`, `nitroDuration`, `repairAmount`.
+- Balance-Schätzung: ca. 100–250 Münzen pro Fahrt → 4–10 Fahrten pro Kiste.
+
 ## Ideen für später (nur nach Absprache)
 - Sounds und Musik
-- Shop: Upgrades mit Münzen (Panzerung, besserer Rammbügel), andere Autos
+- Kleine Unterschiede zwischen den Autos (z. B. etwas mehr Leben, längeres Nitro, max. 10–20 %)
+- Echte 3D-Modelle (CC0) – Schritt 3 des Grafik-Umbaus, noch offen; vor Downloads fragen
 - Weitere Power-ups (z. B. Münzmagnet)
 - Einstellung für niedrigere Grafikqualität
 - Online-Rangliste

@@ -122,6 +122,39 @@
   td:last-child { text-align: right; font-family: "Bungee", sans-serif; }
   tr.me td { background: rgba(155,255,74,.18); }
   .empty { color: #a99db5; padding: 16px 0; }
+  .coin-badge {
+    display: inline-block; margin: 0 0 6px; padding: 6px 16px; border-radius: 999px;
+    font-family: "Bungee", sans-serif; font-size: 20px; color: #ffe48a;
+    background: rgba(0,0,0,.4); border: 2px solid #5a4a20;
+  }
+  .coin-gain { font-family: "Bungee", sans-serif; color: #ffe48a; margin: 4px 0 8px; }
+  .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; }
+  .btn-grid .btn { font-size: 17px; padding: 12px 6px; margin: 6px 0; }
+  /* Garage und Shop: Panel unten, oben ist Platz für das 3D-Auto */
+  .overlay.bottom { align-items: flex-end; background: linear-gradient(rgba(0,0,0,0) 35%, rgba(5,2,8,.75)); }
+  .overlay.bottom .panel { max-height: 56vh; padding: 14px 16px; }
+  .overlay.bottom h2 { font-size: 22px; margin-bottom: 4px; }
+  .car-title { font-family: "Bungee", sans-serif; font-size: 20px; margin: 2px 0 8px; }
+  .rarity { font-family: "Bungee", sans-serif; font-size: 13px; padding: 2px 8px; border-radius: 8px; color: #111; vertical-align: middle; }
+  .big-rarity { display: inline-block; font-size: 18px; padding: 4px 14px; margin-top: 4px; }
+  .car-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
+  .tile {
+    min-height: 54px; padding: 6px 4px; border-radius: 12px; cursor: pointer;
+    border: 3px solid #555; background: #1c1424; color: #fff;
+    font-size: 12px; font-weight: 700; line-height: 1.2; touch-action: manipulation;
+  }
+  .tile small { display: block; font-weight: 400; opacity: .8; margin-top: 2px; }
+  .tile.locked { background: #0a080e; color: #6a6a74; }
+  .tile.locked b { display: block; font-family: "Bungee", sans-serif; font-size: 18px; }
+  .tile.active { box-shadow: 0 0 0 3px #fff; }
+  .tile .check { color: #9bff4a; }
+  .odds { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; font-size: 14px; }
+  .odds div { padding: 6px; border-radius: 10px; background: rgba(0,0,0,.35); border-left: 6px solid; text-align: left; }
+  .upg { text-align: left; padding: 10px 12px; margin: 8px 0; border-radius: 12px; background: rgba(0,0,0,.35); }
+  .upg-head { display: flex; justify-content: space-between; align-items: center; font-family: "Bungee", sans-serif; font-size: 16px; }
+  .pips { color: #ffe48a; letter-spacing: 2px; }
+  .upg-desc { font-size: 13px; color: #cfc6d8; margin: 4px 0 6px; }
+  .upg .btn { margin: 0; padding: 10px; font-size: 16px; }
   .touch-only { display: none; }
   @media (pointer: coarse) {
     .touch-only { display: block; }
@@ -155,8 +188,14 @@
   <div class="panel">
     <h1>Zombie<span>Highway</span></h1>
     <p class="sub">Brich durch die Zombie-Stadt! Ausweichen – oder den Schaden in Kauf nehmen?</p>
+    <div class="coin-badge" id="menuCoins">🪙 0</div>
     <button class="btn" id="startBtn">Losfahren</button>
-    <button class="btn alt" id="boardBtn">Rangliste</button>
+    <div class="btn-grid">
+      <button class="btn alt" id="garageBtn">🚗 Garage</button>
+      <button class="btn alt" id="shopBtn">🎁 Shop</button>
+      <button class="btn alt" id="upgradeBtn">🔧 Upgrades</button>
+      <button class="btn alt" id="boardBtn">🏆 Rangliste</button>
+    </div>
     <div class="controls key-only">
       <kbd>←</kbd> <kbd>→</kbd> oder <kbd>A</kbd> <kbd>D</kbd> Spur wechseln<br>
       <kbd>Leertaste</kbd> <kbd>↑</kbd> <kbd>W</kbd> Springen<br>
@@ -192,6 +231,7 @@
       <div><b id="statCoins">0</b>Münzen</div>
       <div><b id="statZombies">0</b>Zombies</div>
     </div>
+    <div class="coin-gain"><span id="coinGain">+0 Münzen</span> · <span id="overCoins">🪙 0</span></div>
     <div id="nameBox" class="hidden">
       <div class="bungee" style="color:#9bff4a">Neuer Top-10-Platz!</div>
       <input id="nameInput" maxlength="12" placeholder="Dein Name" autocomplete="off" spellcheck="false">
@@ -201,6 +241,47 @@
     <button class="btn" id="againBtn">Nochmal</button>
     <button class="btn alt" id="overBoardBtn">Rangliste</button>
     <button class="btn alt" id="menuBtn">Menü</button>
+  </div>
+</div>
+
+<!-- Garage: unten die Auswahl, oben dreht sich das Auto in 3D -->
+<div id="garageScreen" class="overlay bottom hidden">
+  <div class="panel">
+    <h2>🚗 Garage</h2>
+    <div class="car-title"><span id="garageName">Auto</span> <span class="rarity" id="garageRarity"></span></div>
+    <div class="car-grid" id="garageGrid"></div>
+    <button class="btn green" id="selectBtn">Auswählen</button>
+    <button class="btn alt" id="garageBack">Zurück</button>
+  </div>
+</div>
+
+<!-- Shop: Kisten mit zufälligen Autos -->
+<div id="shopScreen" class="overlay bottom hidden">
+  <div class="panel" id="shopPanel">
+    <h2>🎁 Shop</h2>
+    <div class="coin-badge" id="shopCoins">🪙 0</div>
+    <div id="shopBuy">
+      <p class="sub" style="margin:6px 0">Eine Kiste enthält ein zufälliges Auto.</p>
+      <div class="odds" id="odds"></div>
+      <button class="btn" id="chestBtn">Kiste öffnen · 1.000 🪙</button>
+    </div>
+    <div id="shopResult" class="hidden">
+      <div class="rarity big-rarity" id="resultRarity"></div>
+      <div class="car-title" id="resultName"></div>
+      <p class="sub" id="resultInfo"></p>
+      <button class="btn" id="chestAgainBtn">Noch eine Kiste</button>
+    </div>
+    <button class="btn alt" id="shopBack">Zurück</button>
+  </div>
+</div>
+
+<!-- Upgrades -->
+<div id="upgradeScreen" class="overlay hidden">
+  <div class="panel">
+    <h2>🔧 Upgrades</h2>
+    <div class="coin-badge" id="upgradeCoins">🪙 0</div>
+    <div id="upgradeList"></div>
+    <button class="btn alt" id="upgradeBack">Zurück</button>
   </div>
 </div>
 
@@ -288,6 +369,68 @@ const Leaderboard = {
   }
 };
 
+// Münzkonto: gesammelte Münzen bleiben über alle Fahrten erhalten (nur Spielmünzen)
+const Wallet = {
+  KEY: 'zombie-highway-coins',
+  get() {
+    const n = Store.get(this.KEY, 0);
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;
+  },
+  add(n) {
+    const v = this.get() + Math.max(0, Math.floor(n));
+    Store.set(this.KEY, v);
+    return v;
+  },
+  spend(n) {
+    const v = this.get();
+    if (v < n) return false;
+    Store.set(this.KEY, v - n);
+    return true;
+  }
+};
+const fmt = n => n.toLocaleString('de-DE');
+
+// Garage: welche Autos man besitzt und welches ausgewählt ist
+const Garage = {
+  KEY: 'zombie-highway-garage',
+  load() {
+    const g = Store.get(this.KEY, null) || {};
+    const owned = Array.isArray(g.owned) ? g.owned.filter(id => CAR_BY_ID[id]) : [];
+    if (!owned.includes('starter')) owned.unshift('starter');
+    const selected = owned.includes(g.selected) ? g.selected : 'starter';
+    return { owned, selected };
+  },
+  owns(id) { return this.load().owned.includes(id); },
+  add(id) { const g = this.load(); if (!g.owned.includes(id)) g.owned.push(id); Store.set(this.KEY, g); },
+  select(id) { const g = this.load(); if (g.owned.includes(id)) { g.selected = id; Store.set(this.KEY, g); } }
+};
+
+// Upgrades: je 3 Stufen, mit Münzen kaufbar
+const UPGRADES = [
+  { id: 'armor',  icon: '🛡️', name: 'Panzerung',      step: '−5 % Schaden pro Stufe',        now: l => '−' + l * 5 + ' % Schaden',          prices: [300, 600, 1000] },
+  { id: 'ram',    icon: '🔩', name: 'Rammbügel',      step: '−2 Schaden pro Zombie und Stufe', now: l => 'Zombie-Schaden ' + (DAMAGE.zombie - l * 2), prices: [250, 500, 800] },
+  { id: 'nitro',  icon: '⚡', name: 'Nitro-Tank',     step: '+0,5 s Nitro pro Stufe',          now: l => (NITRO_TIME + l * 0.5).toLocaleString('de-DE') + ' s Nitro', prices: [300, 600, 1000] },
+  { id: 'repair', icon: '🧰', name: 'Werkzeugkasten', step: '+5 Leben pro Kiste und Stufe',    now: l => '+' + (REPAIR_HP + l * 5) + ' Leben pro Kiste', prices: [200, 400, 700] }
+];
+const Upgrades = {
+  KEY: 'zombie-highway-upgrades',
+  load() {
+    const o = Store.get(this.KEY, null) || {};
+    const levels = {};
+    UPGRADES.forEach(u => { levels[u.id] = clamp(Math.floor(Number(o[u.id]) || 0), 0, u.prices.length); });
+    return levels;
+  },
+  buy(id) {
+    const u = UPGRADES.find(x => x.id === id);
+    const levels = this.load();
+    const lvl = levels[id];
+    if (!u || lvl >= u.prices.length || !Wallet.spend(u.prices[lvl])) return false;
+    levels[id] = lvl + 1;
+    Store.set(this.KEY, levels);
+    return true;
+  }
+};
+
 // =====================================================================
 //  GRUNDGERÜST: Renderer, Szene, Kamera, Licht
 // =====================================================================
@@ -339,7 +482,8 @@ const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerW
 }));
 composer.setPixelRatio(renderer.getPixelRatio());
 composer.setSize(innerWidth, innerHeight);
-composer.addPass(new RenderPass(scene, camera));
+const renderPass = new RenderPass(scene, camera);   // zeigt Spiel oder Showroom
+composer.addPass(renderPass);
 // Nur was heller als „weiß“ ist (threshold), fängt an zu strahlen
 const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.55, 1.0);
 composer.addPass(bloomPass);
@@ -663,8 +807,6 @@ const additive = { transparent: true, blending: THREE.AdditiveBlending, depthWri
 //  MATERIALIEN
 // =====================================================================
 const MAT = {
-  // Autolack mit Klarlack-Schicht (MeshPhysicalMaterial ist ein erweitertes MeshStandardMaterial)
-  paint: new THREE.MeshPhysicalMaterial({ color: 0xc41a12, metalness: 0.45, roughness: 0.38, clearcoat: 1, clearcoatRoughness: 0.06 }),
   dark: std(0x26252c, { roughness: 0.6, metalness: 0.3 }),
   metal: std(0xc0c6ce, { roughness: 0.28, metalness: 1 }),
   glass: std(0x0c1626, { roughness: 0.05, metalness: 0.9 }),
@@ -969,75 +1111,326 @@ function addScenery(obj, x, z) {
 }
 
 // =====================================================================
-//  DAS AUTO
+//  AUTOS – das Startauto und die Autos aus den Kisten.
+//  Sie unterscheiden sich vorerst NUR im Aussehen (gleiche Maße beim Zusammenstoß).
 // =====================================================================
-const RED = new THREE.Color(0xd42418), BURNT = new THREE.Color(0x2a1210);
-const carModel = (() => {
-  const root = new THREE.Group();
-  const body = new THREE.Group(); root.add(body);
-  const M = MAT;
-  box(1.9, 0.62, 3.8, M.paint, 0, 0.75, 0, body);          // Karosserie
-  box(1.94, 0.2, 3.86, M.dark, 0, 0.46, 0, body);          // Unterboden
-  box(1.6, 0.12, 1.4, M.paint, 0, 1.1, -1.15, body);       // Motorhaube
-  box(0.5, 0.1, 0.5, M.dark, 0, 1.2, -1.2, body);          // Lufthutze
-  const cab = new THREE.Mesh(UNIT_BOX, [M.glass, M.glass, M.paint, M.paint, M.glass, M.glass]);
-  cab.scale.set(1.66, 0.6, 1.9); cab.position.set(0, 1.36, 0.35); cab.castShadow = true;
-  body.add(cab);
-  box(1.74, 0.09, 2.0, M.paint, 0, 1.69, 0.35, body);      // Dach
-  [-1, 1].forEach(s => {
-    box(0.06, 0.24, 2.7, M.dark, s * 0.97, 0.8, 0.1, body);  // Panzerplatten
-    box(0.05, 0.06, 1.7, M.metal, s * 0.84, 1.3, 0.35, body); // Gitter vor den Fenstern
+const BURNT = new THREE.Color(0x2a1210);
+const paintMat = (color, opts = {}) => new THREE.MeshPhysicalMaterial(Object.assign(
+  { color, metalness: 0.45, roughness: 0.38, clearcoat: 1, clearcoatRoughness: 0.06 }, opts));
+
+// Flammen-Lackierung für das Muscle Car
+TEX.flames = canvasTex(256, 128, (g, w, h) => {
+  g.fillStyle = '#121216'; g.fillRect(0, 0, w, h);
+  ['#ff3a10', '#ff8a1a', '#ffd23a'].forEach((color, layer) => {
+    const s = 1 - layer * 0.22;
+    g.fillStyle = color;
+    for (let k = 0; k < 5; k++) {
+      const yc = h * (0.14 + k * 0.18), hw = h * 0.12 * s;
+      const tip = w * (0.6 + Math.sin(k * 2.1) * 0.2) * s;
+      g.beginPath(); g.moveTo(0, yc - hw);
+      g.quadraticCurveTo(tip * 0.6, yc - hw * 1.3, tip, yc + hw * 0.3);
+      g.quadraticCurveTo(tip * 0.5, yc + hw * 0.5, 0, yc + hw);
+      g.fill();
+    }
   });
-  // Rammbügel mit Stacheln
-  [0.58, 0.98].forEach(y => { const bar = cyl(0.07, 0.07, 2.1, M.metal, 8); bar.rotation.z = Math.PI / 2; bar.position.set(0, y, -2.05); body.add(bar); });
-  [-0.8, 0.8].forEach(x => { const post = cyl(0.07, 0.07, 0.7, M.metal, 8); post.position.set(x, 0.75, -2.05); body.add(post); });
+});
+TEX.checker = canvasTex(128, 16, (g, w, h) => {
+  for (let x = 0; x < w; x += 8) for (let y = 0; y < h; y += 8) {
+    g.fillStyle = ((x + y) / 8) % 2 ? '#111' : '#f4f4f4'; g.fillRect(x, y, 8, 8);
+  }
+});
+TEX.taxi = canvasTex(128, 48, (g, w, h) => {
+  g.fillStyle = '#fff7d0'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#151515'; g.font = 'bold 34px sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  g.fillText('TAXI', w / 2, h / 2 + 2);
+});
+TEX.checker.repeat.set(6, 1);
+
+function newCar(paint) {
+  const root = new THREE.Group(), body = new THREE.Group();
+  root.add(body);
+  return { root, body, wheels: [], flames: null, paint, baseColor: paint.color.clone(), update: null };
+}
+function addCab(c, paint, w, h, len, y, z) {
+  const cab = new THREE.Mesh(UNIT_BOX, [MAT.glass, MAT.glass, paint, paint, MAT.glass, MAT.glass]);
+  cab.scale.set(w, h, len); cab.position.set(0, y, z); cab.castShadow = true;
+  c.body.add(cab);
+  box(w + 0.08, 0.08, len + 0.1, paint, 0, y + h / 2 + 0.04, z, c.body);   // Dach
+}
+function addWheels(c, { r = 0.45, w = 1, x = 0.98, zs = [-1.25, 1.25], mats = WHEEL_MATS } = {}) {
+  zs.forEach(z => [-x, x].forEach(xx => {
+    const m = new THREE.Mesh(WHEEL_GEO, mats);
+    m.scale.set(w, r / 0.45, r / 0.45);
+    m.position.set(xx, r, z); m.castShadow = true;
+    c.root.add(m); c.wheels.push(m);
+  }));
+}
+function addLights(c, { front = -1.91, back = 1.91, y = 0.86, x = 0.62 } = {}) {
+  [-x, x].forEach(xx => {
+    box(0.38, 0.16, 0.05, MAT.headlight, xx, y, front, c.body);
+    box(0.34, 0.12, 0.05, MAT.tail, xx, y + 0.04, back, c.body);
+  });
+}
+const FLAME_OUTER_GEO = new THREE.ConeGeometry(0.24, 1.3, 10).rotateX(Math.PI / 2);
+const FLAME_INNER_GEO = new THREE.ConeGeometry(0.12, 0.8, 8).rotateX(Math.PI / 2);
+function addFlames(c, z = 2.6, y = 0.5, x = 0.5) {
+  const flames = new THREE.Group();
+  [-x, x].forEach(xx => {
+    const o = new THREE.Mesh(FLAME_OUTER_GEO, MAT.flameOuter); o.position.set(xx, y, z);
+    const i = new THREE.Mesh(FLAME_INNER_GEO, MAT.flameInner); i.position.set(xx, y, z - 0.25);
+    flames.add(o, i);
+  });
+  flames.visible = false;
+  c.root.add(flames);
+  c.flames = flames;
+}
+function hBar(len, mat, x, y, z, parent) {      // waagerechte Stange (quer zum Auto)
+  const b = cyl(0.06, 0.06, len, mat, 8); b.rotation.z = Math.PI / 2; b.position.set(x, y, z); parent.add(b); return b;
+}
+function vBar(len, mat, x, y, z, parent) {      // senkrechte Stange
+  const b = cyl(0.06, 0.06, len, mat, 8); b.position.set(x, y, z); parent.add(b); return b;
+}
+
+// --- Startauto: rotes Panzerauto mit Rammbügel und Stacheln ---
+function buildStarter() {
+  const c = newCar(paintMat(0xc41a12)), b = c.body, M = MAT, p = c.paint;
+  box(1.9, 0.62, 3.8, p, 0, 0.75, 0, b);
+  box(1.94, 0.2, 3.86, M.dark, 0, 0.46, 0, b);
+  box(1.6, 0.12, 1.4, p, 0, 1.1, -1.15, b);
+  box(0.5, 0.1, 0.5, M.dark, 0, 1.2, -1.2, b);
+  addCab(c, p, 1.66, 0.6, 1.9, 1.36, 0.35);
+  [-1, 1].forEach(s => {
+    box(0.06, 0.24, 2.7, M.dark, s * 0.97, 0.8, 0.1, b);    // Panzerplatten
+    box(0.05, 0.06, 1.7, M.metal, s * 0.84, 1.3, 0.35, b);  // Gitter vor den Fenstern
+  });
+  [0.58, 0.98].forEach(y => hBar(2.1, M.metal, 0, y, -2.05, b));
+  [-0.8, 0.8].forEach(x => vBar(0.7, M.metal, x, 0.75, -2.05, b));
   const spikeGeo = new THREE.ConeGeometry(0.08, 0.38, 8).rotateX(-Math.PI / 2);
   for (let i = 0; i < 5; i++) {
     const sp = new THREE.Mesh(spikeGeo, M.metal);
     sp.position.set(-0.8 + i * 0.4, 0.78, -2.27); sp.castShadow = true;
-    body.add(sp);
+    b.add(sp);
   }
-  // Dachscheinwerfer
-  box(1.3, 0.14, 0.22, M.dark, 0, 1.81, -0.35, body);
-  [-0.45, -0.15, 0.15, 0.45].forEach(x => box(0.22, 0.11, 0.06, M.roofLamp, x, 1.81, -0.47, body));
-  // Scheinwerfer und Rücklichter
-  [-0.62, 0.62].forEach(x => {
-    box(0.38, 0.16, 0.05, M.headlight, x, 0.86, -1.91, body);
-    box(0.34, 0.12, 0.05, M.tail, x, 0.9, 1.91, body);
-  });
-  // Ersatzrad hinten
+  box(1.3, 0.14, 0.22, M.dark, 0, 1.81, -0.35, b);
+  [-0.45, -0.15, 0.15, 0.45].forEach(x => box(0.22, 0.11, 0.06, M.roofLamp, x, 1.81, -0.47, b));
+  addLights(c);
   const spare = new THREE.Mesh(WHEEL_GEO, WHEEL_MATS);
   spare.rotation.y = Math.PI / 2; spare.scale.setScalar(0.85);
   spare.position.set(0, 1.08, 2.06); spare.castShadow = true;
-  body.add(spare);
-  // Räder (drehen sich)
-  const wheels = [];
-  [[-0.98, -1.25], [0.98, -1.25], [-0.98, 1.25], [0.98, 1.25]].forEach(([x, z]) => {
-    const w = new THREE.Mesh(WHEEL_GEO, WHEEL_MATS);
-    w.position.set(x, 0.45, z); w.castShadow = true;
-    root.add(w); wheels.push(w);
+  b.add(spare);
+  addWheels(c);
+  addFlames(c);
+  return c;
+}
+
+// --- Pickup: blau, offene Ladefläche, Überrollbügel ---
+function buildPickup() {
+  const c = newCar(paintMat(0x2f6fb8)), b = c.body, M = MAT, p = c.paint;
+  box(1.9, 0.6, 3.9, p, 0, 0.75, 0, b);
+  box(1.94, 0.18, 3.94, M.dark, 0, 0.46, 0, b);
+  box(1.7, 0.1, 1.15, p, 0, 1.1, -1.3, b);
+  addCab(c, p, 1.72, 0.62, 1.35, 1.36, -0.4);
+  box(1.76, 0.06, 1.75, M.dark, 0, 1.07, 1.05, b);              // Ladefläche
+  [-1, 1].forEach(s => box(0.08, 0.34, 1.75, p, s * 0.91, 1.22, 1.05, b));
+  box(1.82, 0.34, 0.08, p, 0, 1.22, 1.93, b);                    // Heckklappe
+  [-0.75, 0.75].forEach(x => vBar(0.6, M.metal, x, 1.65, 0.38, b));
+  hBar(1.56, M.metal, 0, 1.95, 0.38, b);                          // Überrollbügel
+  box(1.98, 0.18, 0.16, M.metal, 0, 0.6, -1.98, b);              // Chrom-Stoßstange
+  box(1.98, 0.18, 0.16, M.metal, 0, 0.6, 1.98, b);
+  box(0.9, 0.3, 0.6, M.crate, 0.3, 1.25, 1.2, b);                // Kiste auf der Ladefläche
+  addLights(c, { front: -1.96, back: 1.98 });
+  addWheels(c, { zs: [-1.3, 1.3] });
+  addFlames(c, 2.65);
+  return c;
+}
+
+// --- Alter Kombi: beige, lang, Holzverkleidung, Dachgepäck ---
+function buildKombi() {
+  const c = newCar(paintMat(0xc2a476, { metalness: 0.2, roughness: 0.5 })), b = c.body, M = MAT, p = c.paint;
+  box(1.86, 0.56, 4.1, p, 0, 0.72, 0, b);
+  box(1.9, 0.16, 4.14, M.dark, 0, 0.45, 0, b);
+  addCab(c, p, 1.66, 0.6, 2.8, 1.3, 0.45);
+  [-1, 1].forEach(s => box(0.04, 0.3, 3.2, M.wood, s * 0.94, 0.76, 0.25, b));  // Holzverkleidung
+  [-0.6, 0.6].forEach(x => box(0.06, 0.06, 2.6, M.metal, x, 1.72, 0.45, b));   // Dachreling
+  box(1.0, 0.32, 1.2, M.rust[1], 0, 1.9, 0.7, b);                // Koffer auf dem Dach
+  box(0.7, 0.26, 0.8, M.crate, -0.1, 1.86, -0.2, b);
+  box(1.92, 0.16, 0.14, M.metal, 0, 0.58, -2.07, b);
+  box(1.92, 0.16, 0.14, M.metal, 0, 0.58, 2.07, b);
+  addLights(c, { front: -2.06, back: 2.06, y: 0.82 });
+  addWheels(c, { r: 0.42, zs: [-1.35, 1.35] });
+  addFlames(c, 2.75);
+  return c;
+}
+
+// --- Taxi: gelb, Schachbrett-Streifen, Dachschild ---
+function buildTaxi() {
+  const c = newCar(paintMat(0xf2c21a)), b = c.body, M = MAT, p = c.paint;
+  box(1.86, 0.58, 3.95, p, 0, 0.74, 0, b);
+  box(1.9, 0.16, 4.0, M.dark, 0, 0.46, 0, b);
+  addCab(c, p, 1.62, 0.58, 1.9, 1.32, 0.1);
+  const stripeMat = std(0xffffff, { map: TEX.checker, roughness: 0.5 });
+  [-1, 1].forEach(s => box(0.03, 0.12, 3.2, stripeMat, s * 0.945, 0.86, 0, b));
+  const sign = new THREE.Mesh(UNIT_BOX, basic(glow(0xffffff, 1.0), { map: TEX.taxi }));
+  sign.scale.set(0.75, 0.24, 0.32); sign.position.set(0, 1.79, 0.1);
+  b.add(sign);
+  box(1.92, 0.16, 0.14, M.metal, 0, 0.58, -2.0, b);
+  box(1.92, 0.16, 0.14, M.metal, 0, 0.58, 2.0, b);
+  addLights(c, { front: -1.99, back: 1.99 });
+  addWheels(c);
+  addFlames(c, 2.65);
+  return c;
+}
+
+// --- Polizeiauto: schwarz-weiß, blinkendes Blaulicht, Schubbügel ---
+function buildPolice() {
+  const c = newCar(paintMat(0x15161c)), b = c.body, M = MAT, p = c.paint;
+  const white = paintMat(0xf2f2f2);
+  box(1.86, 0.58, 3.95, p, 0, 0.74, 0, b);
+  box(1.9, 0.16, 4.0, M.dark, 0, 0.46, 0, b);
+  [-1, 1].forEach(s => box(0.03, 0.46, 1.9, white, s * 0.945, 0.78, 0.1, b));   // weiße Türen
+  box(1.5, 0.03, 1.1, white, 0, 1.045, -1.35, b);                                // weiße Haube
+  addCab(c, p, 1.62, 0.58, 1.9, 1.32, 0.1);
+  box(1.3, 0.1, 0.32, M.dark, 0, 1.7, 0.1, b);
+  const red = basic(glow(0xff2020, 4)), blue = basic(glow(0x2050ff, 4));
+  box(0.55, 0.14, 0.28, red, -0.33, 1.8, 0.1, b);
+  box(0.55, 0.14, 0.28, blue, 0.33, 1.8, 0.1, b);
+  [-0.6, 0.6].forEach(x => vBar(0.55, M.dark, x, 0.75, -2.12, b));               // Schubbügel
+  [0.6, 0.95].forEach(y => hBar(1.4, M.dark, 0, y, -2.12, b));
+  addLights(c, { front: -1.99, back: 1.99 });
+  addWheels(c);
+  addFlames(c, 2.65);
+  c.update = t => {       // abwechselnd blinken
+    const on = Math.sin(t * 14) > 0;
+    red.color.setHex(0xff2020).multiplyScalar(on ? 5 : 0.3);
+    blue.color.setHex(0x2050ff).multiplyScalar(on ? 0.3 : 5);
+  };
+  return c;
+}
+
+// --- Geländewagen: grün, hochgelegt, große Reifen, Dachträger mit Lampen, Schnorchel ---
+function buildOffroad() {
+  const c = newCar(paintMat(0x4a5e3a, { metalness: 0.3, roughness: 0.5 })), b = c.body, M = MAT, p = c.paint;
+  b.position.y = 0.22;
+  box(1.95, 0.74, 3.8, p, 0, 0.82, 0, b);
+  box(1.99, 0.18, 3.84, M.dark, 0, 0.46, 0, b);
+  addCab(c, p, 1.86, 0.7, 2.3, 1.54, 0.35);
+  [-1, 1].forEach(s => [-1.3, 1.3].forEach(z => box(0.16, 0.12, 1.25, M.dark, s * 1.02, 0.95, z, b)));  // Kotflügel
+  box(1.9, 0.06, 2.1, M.dark, 0, 2.0, 0.35, b);                   // Dachträger
+  [-0.6, -0.2, 0.2, 0.6].forEach(x => box(0.24, 0.16, 0.08, M.roofLamp, x, 2.12, -0.62, b));
+  const snorkel = cyl(0.07, 0.07, 1.3, M.dark, 8); snorkel.position.set(0.95, 1.45, -0.85); b.add(snorkel);
+  box(2.02, 0.22, 0.2, M.dark, 0, 0.62, -1.98, b);               // Seilwinde-Stoßstange
+  const spare = new THREE.Mesh(WHEEL_GEO, WHEEL_MATS);
+  spare.rotation.y = Math.PI / 2; spare.position.set(0, 1.15, 2.08); spare.castShadow = true;
+  b.add(spare);
+  addLights(c, { front: -1.91, back: 1.91, y: 0.95 });
+  addWheels(c, { r: 0.58, w: 1.3, x: 1.02, zs: [-1.3, 1.3] });
+  addFlames(c, 2.6, 0.75);
+  return c;
+}
+
+// --- Monstertruck: orange, riesige Räder, sichtbare Federung ---
+function buildMonster() {
+  const c = newCar(paintMat(0xff5a14)), b = c.body, M = MAT, p = c.paint;
+  b.position.y = 0.95;
+  box(1.8, 0.55, 3.5, p, 0, 0.75, 0, b);
+  box(1.4, 0.3, 3.2, M.dark, 0, 0.35, 0, b);                     // Rahmen
+  addCab(c, p, 1.6, 0.58, 1.4, 1.32, -0.1);
+  box(1.6, 0.1, 1.0, p, 0, 1.08, -1.2, b);
+  [-1, 1].forEach(s => box(0.08, 0.3, 1.2, p, s * 0.86, 1.15, 1.15, b));       // Ladefläche
+  box(1.2, 0.12, 0.3, M.roofLamp, 0, 1.72, -0.55, b);
+  addLights(c, { front: -1.76, back: 1.76, y: 0.85 });
+  addWheels(c, { r: 0.95, w: 1.9, x: 1.18, zs: [-1.35, 1.35] });
+  [-1, 1].forEach(s => [-1.35, 1.35].forEach(z => {                             // Stoßdämpfer
+    const d = cyl(0.07, 0.07, 1.1, M.metal, 8);
+    d.position.set(s * 0.85, 1.35, z); d.rotation.z = s * 0.6; c.root.add(d);
+  }));
+  addFlames(c, 2.35, 1.4);
+  return c;
+}
+
+// --- Gepanzerter Transporter: hoch, kantig, Sehschlitze, Nieten, 3 Achsen ---
+function buildTransporter() {
+  const c = newCar(paintMat(0x5a6650, { metalness: 0.5, roughness: 0.6, clearcoat: 0.3 })), b = c.body, M = MAT, p = c.paint;
+  box(2.0, 1.45, 4.0, p, 0, 1.2, 0, b);
+  box(2.04, 0.2, 4.04, M.dark, 0, 0.46, 0, b);
+  box(1.7, 0.16, 0.05, M.glass, 0, 1.62, -2.02, b);              // Sehschlitz vorne
+  [-1, 1].forEach(s => {
+    [-1.2, 0, 1.2].forEach(z => box(0.05, 0.1, 0.6, M.glass, s * 1.01, 1.5, z, b));  // Sehschlitze Seite
+    for (let i = 0; i < 7; i++) box(0.05, 0.06, 0.06, M.metal, s * 1.02, 0.85, -1.8 + i * 0.6, b);  // Nieten
   });
-  // Echte Scheinwerfer
-  [-0.6, 0.6].forEach(x => {
-    const sp = new THREE.SpotLight(0xfff2cc, 110, 50, 0.5, 0.5, 2);
-    sp.position.set(x, 0.9, -1.9);
-    sp.target.position.set(x * 1.6, 0, -20);
-    root.add(sp, sp.target);
+  const plate = box(2.1, 0.7, 0.14, M.dark, 0, 0.65, -2.1, b);   // Rammschild
+  plate.rotation.x = -0.35;
+  box(0.8, 0.3, 0.8, p, 0, 2.08, 0.3, b);                        // Dachluke
+  box(0.6, 0.12, 0.25, M.roofLamp, 0, 2.0, -0.6, b);
+  addLights(c, { front: -2.02, back: 2.02, y: 1.0, x: 0.7 });
+  addWheels(c, { r: 0.5, w: 1.2, x: 1.0, zs: [-1.4, 0, 1.4] });
+  addFlames(c, 2.75, 0.6, 0.6);
+  return c;
+}
+
+// --- Muscle Car: flach, Flammen-Lackierung, Kompressor auf der Haube, Spoiler ---
+function buildMuscle() {
+  const c = newCar(paintMat(0xffffff, { map: TEX.flames })), b = c.body, M = MAT, p = c.paint;
+  box(1.95, 0.5, 4.1, p, 0, 0.62, 0, b);
+  box(1.99, 0.14, 4.14, M.dark, 0, 0.4, 0, b);
+  addCab(c, p, 1.6, 0.44, 1.6, 1.09, 0.45);
+  box(0.55, 0.28, 0.6, M.metal, 0, 1.0, -0.95, b);               // Kompressor
+  box(0.6, 0.12, 0.25, M.dark, 0, 1.2, -1.0, b);
+  box(1.95, 0.06, 0.4, M.dark, 0, 1.15, 1.9, b);                 // Spoiler
+  [-0.7, 0.7].forEach(x => box(0.08, 0.3, 0.08, M.dark, x, 0.98, 1.9, b));
+  [-1, 1].forEach(s => {                                          // Seitenauspuff
+    const pipe = cyl(0.07, 0.07, 1.6, M.metal, 8); pipe.rotation.x = Math.PI / 2;
+    pipe.position.set(s * 1.03, 0.35, 0.3); b.add(pipe);
   });
-  // Blaue Nitro-Flammen
-  const flames = new THREE.Group();
-  const outerGeo = new THREE.ConeGeometry(0.24, 1.3, 10).rotateX(Math.PI / 2);
-  const innerGeo = new THREE.ConeGeometry(0.12, 0.8, 8).rotateX(Math.PI / 2);
-  [-0.5, 0.5].forEach(x => {
-    const o = new THREE.Mesh(outerGeo, M.flameOuter); o.position.set(x, 0.5, 2.6);
-    const i = new THREE.Mesh(innerGeo, M.flameInner); i.position.set(x, 0.5, 2.35);
-    flames.add(o, i);
-  });
-  flames.visible = false;
-  root.add(flames);
-  scene.add(root);
-  return { root, body, wheels, flames };
-})();
+  addLights(c, { front: -2.06, back: 2.06, y: 0.72, x: 0.66 });
+  addWheels(c, { r: 0.44, w: 1.0, x: 0.98, zs: [-1.35] });
+  addWheels(c, { r: 0.48, w: 1.5, x: 1.0, zs: [1.35] });
+  addFlames(c, 2.75, 0.45);
+  return c;
+}
+
+const RARITY = {
+  common:    { name: 'Gewöhnlich', color: '#a9a9b3', chance: 0.60, refund: 200 },
+  rare:      { name: 'Selten',     color: '#3a9bff', chance: 0.25, refund: 400 },
+  epic:      { name: 'Episch',     color: '#b45cff', chance: 0.12, refund: 700 },
+  legendary: { name: 'Legendär',   color: '#ffc21a', chance: 0.03, refund: 1000 }
+};
+const CARS = [
+  { id: 'starter',     name: 'Zombie-Brecher',     rarity: 'starter',   build: buildStarter },
+  { id: 'pickup',      name: 'Pickup',             rarity: 'common',    build: buildPickup },
+  { id: 'kombi',       name: 'Alter Kombi',        rarity: 'common',    build: buildKombi },
+  { id: 'taxi',        name: 'Taxi',               rarity: 'common',    build: buildTaxi },
+  { id: 'police',      name: 'Polizeiauto',        rarity: 'rare',      build: buildPolice },
+  { id: 'offroad',     name: 'Geländewagen',       rarity: 'rare',      build: buildOffroad },
+  { id: 'monster',     name: 'Monstertruck',       rarity: 'epic',      build: buildMonster },
+  { id: 'transporter', name: 'Panzer-Transporter', rarity: 'epic',      build: buildTransporter },
+  { id: 'muscle',      name: 'Flammen-Muscle-Car', rarity: 'legendary', build: buildMuscle }
+];
+const CAR_BY_ID = Object.fromEntries(CARS.map(c => [c.id, c]));
+const rarityName = r => r === 'starter' ? 'Startauto' : RARITY[r].name;
+const rarityColor = r => r === 'starter' ? '#ff6a3a' : RARITY[r].color;
+
+function buildCar(id, withLights) {
+  const c = (CAR_BY_ID[id] || CAR_BY_ID.starter).build();
+  if (withLights) {
+    // Echte Scheinwerfer (nur im Spiel, nicht im Showroom)
+    [-0.6, 0.6].forEach(x => {
+      const sp = new THREE.SpotLight(0xfff2cc, 110, 50, 0.5, 0.5, 2);
+      sp.position.set(x, 0.9, -1.9);
+      sp.target.position.set(x * 1.6, 0, -20);
+      c.root.add(sp, sp.target);
+    });
+  }
+  return c;
+}
+
+let carModel = buildCar(Garage.load().selected, true);
+scene.add(carModel.root);
+function setPlayerCar(id) {
+  scene.remove(carModel.root);
+  carModel = buildCar(id, true);
+  scene.add(carModel.root);
+}
 
 // =====================================================================
 //  ZOMBIES, HINDERNISSE, MÜNZEN, RAMPEN, WERKZEUGKISTEN
@@ -1296,7 +1689,13 @@ const ui = {
   score: $('score'), coins: $('coinText'), zombies: $('zombieText'),
   menu: $('menu'), board: $('boardScreen'), boardBody: $('boardBody'), over: $('overScreen'),
   finalScore: $('finalScore'), statDist: $('statDist'), statCoins: $('statCoins'), statZombies: $('statZombies'),
-  nameBox: $('nameBox'), nameInput: $('nameInput'), saveBtn: $('saveBtn'), overInfo: $('overInfo')
+  nameBox: $('nameBox'), nameInput: $('nameInput'), saveBtn: $('saveBtn'), overInfo: $('overInfo'),
+  menuCoins: $('menuCoins'), coinGain: $('coinGain'), overCoins: $('overCoins'),
+  garage: $('garageScreen'), garageGrid: $('garageGrid'), garageName: $('garageName'), garageRarity: $('garageRarity'), selectBtn: $('selectBtn'),
+  shop: $('shopScreen'), shopPanel: $('shopPanel'), shopBuy: $('shopBuy'), shopResult: $('shopResult'), shopCoins: $('shopCoins'),
+  odds: $('odds'), chestBtn: $('chestBtn'), chestAgainBtn: $('chestAgainBtn'),
+  resultRarity: $('resultRarity'), resultName: $('resultName'), resultInfo: $('resultInfo'),
+  upgrade: $('upgradeScreen'), upgradeList: $('upgradeList'), upgradeCoins: $('upgradeCoins')
 };
 
 const currentScore = () => Math.floor(state.dist) + state.coins * COIN_POINTS + state.zombies * ZOMBIE_POINTS;
@@ -1327,6 +1726,7 @@ function resetGame() {
 function startGame() {
   if (document.activeElement) document.activeElement.blur();
   resetGame();
+  upg = Upgrades.load();      // gekaufte Upgrades für diese Fahrt
   state.mode = 'playing';
   // Startreihen, damit die Straße nicht leer ist, bis die ersten Dinge aus dem Nebel kommen
   for (let z = -40; z > SPAWN_Z; z -= 16) spawnPattern(SPEED_START, z);
@@ -1334,6 +1734,16 @@ function startGame() {
   ui.hud.classList.remove('hidden');
   ui.nitroBtn.classList.toggle('hidden', !isTouch);
 }
+
+// Gekaufte Upgrades (werden bei jedem Start neu geladen)
+let upg = Upgrades.load();
+function damageFor(kind) {
+  let amount = DAMAGE[kind];
+  if (kind === 'zombie') amount -= upg.ram * 2;     // Rammbügel
+  return amount * (1 - upg.armor * 0.05);           // Panzerung
+}
+const nitroDuration = () => NITRO_TIME + upg.nitro * 0.5;
+const repairAmount = () => REPAIR_HP + upg.repair * 5;
 
 function damage(amount) {
   if (state.mode !== 'playing') return;
@@ -1354,7 +1764,7 @@ function addNitro(v) {
 
 function activateNitro() {
   if (state.mode !== 'playing' || state.nitro < 100 || state.nitroTime > 0) return;
-  state.nitroTime = NITRO_TIME;
+  state.nitroTime = nitroDuration();
   toast('NITRO!', '#7fe6ff');
 }
 
@@ -1373,6 +1783,7 @@ function gameOver() {
   state.mode = 'over';
   state.nitroTime = 0;
   lastResult = { score: currentScore(), dist: Math.floor(state.dist), coins: state.coins, zombies: state.zombies };
+  lastResult.wallet = Wallet.add(state.coins);    // Münzen aufs Konto
   ui.nitroBtn.classList.add('hidden');
   setTimeout(showGameOver, 1100);
 }
@@ -1443,7 +1854,7 @@ function spawning(dt, d, base) {
   state.nextPattern -= d;
   while (state.nextPattern <= 0) {
     const extra = spawnPattern(base);
-    state.nextPattern += rand(11, 15) - state.diff * 3 + extra;
+    state.nextPattern += rand(12, 16) - state.diff * 3 + extra;
   }
   state.zombieTimer -= dt;
   if (state.zombieTimer <= 0) {
@@ -1522,13 +1933,13 @@ function hitZombie(zb) {
   state.zombies++;
   addNitro(ZOMBIE_NITRO);
   spawnBits(zb.x, 0.8, zb.z, 14, MAT.goo, 0.1, 0.22, 1);
-  damage(DAMAGE.zombie);
+  damage(damageFor('zombie'));
 }
 
 function hitObstacle(o) {
   o.dead = true;
   spawnBits(o.x, 0.3, o.z, 12, DEBRIS_MAT[o.type], 0.2, 0.5, 1);
-  damage(DAMAGE[o.type]);
+  damage(damageFor(o.type));
 }
 
 function collect(o) {
@@ -1538,8 +1949,8 @@ function collect(o) {
     addNitro(COIN_NITRO);
     spawnBits(o.x, o.y - 0.3, o.z, 4, MAT.gold, 0.06, 0.12, 0.5);
   } else {
-    state.hp = Math.min(MAX_HP, state.hp + REPAIR_HP);
-    toast('+' + REPAIR_HP + ' ❤', '#7dff6a');
+    state.hp = Math.min(MAX_HP, state.hp + repairAmount());
+    toast('+' + repairAmount() + ' ❤', '#7dff6a');
     spawnBits(o.x, o.y - 0.3, o.z, 8, MAT.repair, 0.08, 0.16, 0.6);
   }
 }
@@ -1610,7 +2021,8 @@ function updateCar(dt, d) {
   const hp = state.hp;
   const targetDark = state.mode === 'over' ? 0.8 : hp < 25 ? 0.6 : hp < 50 ? 0.35 : 0;
   car.dark = lerp(car.dark, targetDark, Math.min(1, dt * 3));
-  MAT.paint.color.copy(RED).lerp(BURNT, car.dark);
+  carModel.paint.color.copy(carModel.baseColor).lerp(BURNT, car.dark);
+  if (carModel.update) carModel.update(clockTime);
   const rate = state.mode === 'over' ? 30 : state.mode !== 'playing' ? 0 : hp < 25 ? 22 : hp < 50 ? 9 : 0;
   smokeAcc += rate * dt;
   while (smokeAcc >= 1) { smokeAcc -= 1; emitSmoke(hp < 25 || state.mode === 'over'); }
@@ -1673,7 +2085,7 @@ function updateHUD() {
   setText(ui.hpText, 'hp', hp);
   ui.hpFill.style.width = hp + '%';
   ui.hpFill.className = hp < 25 ? 'low' : hp < 50 ? 'mid' : '';
-  const nitroShown = state.nitroTime > 0 ? state.nitroTime / NITRO_TIME * 100 : state.nitro;
+  const nitroShown = state.nitroTime > 0 ? state.nitroTime / nitroDuration() * 100 : state.nitro;
   ui.nitroFill.style.width = nitroShown.toFixed(1) + '%';
   const ready = state.nitro >= 100 && state.nitroTime <= 0;
   ui.nitroBar.classList.toggle('full', ready);
@@ -1721,7 +2133,13 @@ const clock = new THREE.Clock();
 function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.05);
-  update(dt);
+  if (show.active) {
+    updateShowroom(dt);
+    renderPass.scene = showScene; renderPass.camera = showCam;
+  } else {
+    update(dt);
+    renderPass.scene = scene; renderPass.camera = camera;
+  }
   composer.render();
 }
 
@@ -1763,6 +2181,8 @@ async function showGameOver() {
   ui.statDist.textContent = r.dist;
   ui.statCoins.textContent = r.coins;
   ui.statZombies.textContent = r.zombies;
+  ui.coinGain.textContent = '+' + fmt(r.coins) + ' Münzen';
+  ui.overCoins.textContent = '🪙 ' + fmt(r.wallet);
   const list = await Leaderboard.load();
   const qualifies = r.score > 0 && (list.length < Leaderboard.SIZE || r.score > list[list.length - 1].score);
   saved = false;
@@ -1795,6 +2215,7 @@ function goToMenu() {
   ui.over.classList.add('hidden');
   ui.board.classList.add('hidden');
   ui.nitroBtn.classList.add('hidden');
+  updateCoinBadges();
   ui.menu.classList.remove('hidden');
 }
 
@@ -1809,6 +2230,316 @@ $('boardBack').addEventListener('click', () => {
 });
 ui.saveBtn.addEventListener('click', saveName);
 ui.nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
+
+// =====================================================================
+//  SHOWROOM: eigene kleine 3D-Szene für Garage und Shop
+// =====================================================================
+const glowCss = (css, strength) => new THREE.Color(css).multiplyScalar(strength);
+const showScene = new THREE.Scene();
+showScene.background = new THREE.Color(0x0c0910);
+showScene.environment = scene.environment;
+showScene.fog = new THREE.Fog(0x0c0910, 16, 40);
+const showCam = new THREE.PerspectiveCamera(40, innerWidth / innerHeight, 0.1, 100);
+showScene.add(new THREE.HemisphereLight(0x8a96d0, 0x201418, 1.0));
+const showSpot = new THREE.SpotLight(0xffffff, 300, 30, 0.6, 0.6, 2);
+showSpot.position.set(2, 9, 4);
+showSpot.castShadow = true;
+showSpot.shadow.mapSize.set(1024, 1024);
+showScene.add(showSpot, showSpot.target);
+[[0xff4a2a, -4], [0x3a7bff, 4]].forEach(([color, x]) => {   // farbige Kantenlichter
+  const l = new THREE.PointLight(color, 14, 14, 2);
+  l.position.set(x, 2, -3);
+  showScene.add(l);
+});
+const showFloor = new THREE.Mesh(new THREE.CircleGeometry(7, 48), std(0x18141e, { roughness: 0.3, metalness: 0.4 }));
+showFloor.rotation.x = -Math.PI / 2;
+showFloor.receiveShadow = true;
+showScene.add(showFloor);
+const ringMat = basic(glow(0xffc030, 1.2));
+const showRing = new THREE.Mesh(new THREE.RingGeometry(3.0, 3.12, 64), ringMat);
+showRing.rotation.x = -Math.PI / 2;
+showRing.position.y = 0.01;
+showScene.add(showRing);
+const turntable = new THREE.Group();
+showScene.add(turntable);
+const flash = new THREE.Sprite(new THREE.SpriteMaterial(Object.assign({ map: TEX.soft, color: glow(0xffffff, 3), opacity: 0 }, additive)));
+flash.position.y = 1.2;
+showScene.add(flash);
+
+// Die Kiste mit Deckel (Scharnier hinten)
+const goldMat = std(0xffc030, { metalness: 1, roughness: 0.3 });
+const chest = new THREE.Group();
+{
+  box(1.5, 0.8, 1.0, MAT.crate, 0, 0.4, 0, chest);
+  [0.06, 0.74].forEach(y => box(1.54, 0.08, 1.04, goldMat, 0, y, 0, chest));
+  box(0.22, 0.26, 0.08, goldMat, 0, 0.7, 0.53, chest);       // Schloss vorne
+  const lid = new THREE.Group();
+  lid.position.set(0, 0.8, -0.5);
+  box(1.54, 0.3, 1.04, MAT.crate, 0, 0.15, 0.5, lid);
+  box(1.58, 0.07, 1.08, goldMat, 0, 0.3, 0.5, lid);
+  chest.add(lid);
+  chest.userData.lid = lid;
+  chest.visible = false;
+  showScene.add(chest);
+}
+
+const show = { active: false, mode: 'garage', car: null, cache: {}, t: 0, ct: 0, phase: 'idle', result: null };
+const SIL_MAT = std(0x040406, { roughness: 0.3, metalness: 1 });   // dunkle Silhouette für fehlende Autos
+
+function showroomCar(id, silhouette) {
+  const key = id + (silhouette ? '-sil' : '');
+  if (!show.cache[key]) {
+    const c = buildCar(id, false);
+    if (silhouette) c.root.traverse(o => { if (o.isMesh) o.material = SIL_MAT; });
+    show.cache[key] = c;
+  }
+  return show.cache[key];
+}
+function displayCar(id, silhouette) {
+  if (show.car) turntable.remove(show.car.root);
+  show.car = showroomCar(id, silhouette);
+  show.car.root.visible = true;
+  show.car.root.scale.setScalar(1);
+  turntable.add(show.car.root);
+  ringMat.color.copy(glowCss(rarityColor(CAR_BY_ID[id].rarity), silhouette ? 0.5 : 1.2));
+}
+function layoutShowCam() {
+  const w = innerWidth, h = innerHeight, aspect = w / h;
+  showCam.aspect = aspect;
+  // Abstand so wählen, dass das Auto auch im Hochformat ganz zu sehen ist
+  const dist = Math.max(13, 2.7 / (Math.tan(THREE.MathUtils.degToRad(20)) * aspect));
+  showCam.position.set(0, dist * 0.3, dist);
+  showCam.lookAt(0, 0.8, 0);
+  showCam.setViewOffset(w, h, 0, h * 0.27, w, h);     // Auto etwas nach oben schieben (unten ist das Menü)
+  showCam.updateProjectionMatrix();
+}
+layoutShowCam();
+
+const easeOutBack = x => 1 + 2.70158 * Math.pow(x - 1, 3) + 1.70158 * Math.pow(x - 1, 2);
+function updateShowroom(dt) {
+  show.t += dt;
+  turntable.rotation.y += dt * 0.6;
+  if (show.car && show.car.update) show.car.update(show.t);
+  if (show.mode === 'shop') updateChest(dt);
+}
+// Kisten-Animation: wackeln → aufspringen → Auto erscheint
+function updateChest(dt) {
+  const lid = chest.userData.lid;
+  if (show.phase === 'idle') {
+    chest.position.y = Math.sin(show.t * 2) * 0.05;
+    chest.rotation.y = Math.sin(show.t * 0.7) * 0.3;
+    return;
+  }
+  show.ct += dt;
+  const t = show.ct;
+  if (t < 1.4) {
+    const k = t / 1.4;
+    chest.rotation.set(0, 0, Math.sin(t * 32) * 0.12 * k);
+    chest.position.y = Math.abs(Math.sin(t * 14)) * 0.18 * k;
+    return;
+  }
+  chest.rotation.set(0, 0, 0);
+  chest.position.y = 0;
+  lid.rotation.x = lerp(lid.rotation.x, -1.9, Math.min(1, dt * 14));
+  const f = t - 1.4;
+  flash.material.opacity = Math.max(0, 1 - f * 1.6);
+  flash.scale.setScalar(1 + f * 12);
+  if (t > 1.7) chest.scale.setScalar(Math.max(0.001, 1 - (t - 1.7) * 4));
+  if (t > 1.8 && show.car) {
+    show.car.root.visible = true;
+    show.car.root.scale.setScalar(Math.max(0.001, easeOutBack(Math.min(1, (t - 1.8) / 0.5))));
+  }
+  if (t > 2.4 && show.phase !== 'done') {
+    show.phase = 'done';
+    chest.visible = false;
+    showChestResult();
+  }
+}
+
+function updateCoinBadges() {
+  const text = '🪙 ' + fmt(Wallet.get());
+  [ui.menuCoins, ui.shopCoins, ui.upgradeCoins].forEach(el => { el.textContent = text; });
+}
+function enterShowroom(mode) {
+  show.active = true;
+  show.mode = mode;
+  ui.menu.classList.add('hidden');
+  layoutShowCam();
+}
+function leaveShowroom() {
+  show.active = false;
+  ui.garage.classList.add('hidden');
+  ui.shop.classList.add('hidden');
+  updateCoinBadges();
+  ui.menu.classList.remove('hidden');
+}
+
+// ---------- Garage ----------
+let garageView = 'starter';
+function openGarage() {
+  enterShowroom('garage');
+  chest.visible = false;
+  garageView = Garage.load().selected;
+  renderGarage();
+  ui.garage.classList.remove('hidden');
+}
+function renderGarage() {
+  const g = Garage.load();
+  ui.garageGrid.textContent = '';
+  CARS.forEach(def => {
+    const owned = g.owned.includes(def.id);
+    const tile = document.createElement('button');
+    tile.className = 'tile' + (owned ? '' : ' locked') + (def.id === garageView ? ' active' : '');
+    tile.style.borderColor = owned ? rarityColor(def.rarity) : '#2a2a32';
+    if (owned) {
+      tile.append(def.name);
+      if (def.id === g.selected) {
+        const check = document.createElement('span');
+        check.className = 'check'; check.textContent = ' ✓';
+        tile.appendChild(check);
+      }
+    } else {
+      const q = document.createElement('b'); q.textContent = '?';
+      tile.appendChild(q);
+    }
+    const small = document.createElement('small');
+    small.textContent = rarityName(def.rarity);
+    small.style.color = rarityColor(def.rarity);
+    tile.appendChild(small);
+    tile.addEventListener('click', () => { garageView = def.id; renderGarage(); });
+    ui.garageGrid.appendChild(tile);
+  });
+  const def = CAR_BY_ID[garageView], owned = g.owned.includes(garageView);
+  ui.garageName.textContent = owned ? def.name : '???';
+  ui.garageRarity.textContent = rarityName(def.rarity);
+  ui.garageRarity.style.background = rarityColor(def.rarity);
+  ui.selectBtn.disabled = !owned || g.selected === garageView;
+  ui.selectBtn.textContent = !owned ? 'Noch nicht gefunden' : g.selected === garageView ? 'Ausgewählt ✓' : 'Auswählen';
+  displayCar(garageView, !owned);
+}
+function selectGarageCar() {
+  Garage.select(garageView);
+  setPlayerCar(garageView);
+  renderGarage();
+}
+
+// ---------- Shop ----------
+const CHEST_PRICE = 1000;
+ui.odds.textContent = '';
+Object.values(RARITY).forEach(r => {
+  const d = document.createElement('div');
+  d.style.borderColor = r.color;
+  d.textContent = r.name + ' · ' + Math.round(r.chance * 100) + ' %';
+  ui.odds.appendChild(d);
+});
+function setChestButton(btn, label) {
+  const missing = CHEST_PRICE - Wallet.get();
+  btn.disabled = missing > 0;
+  btn.textContent = missing > 0 ? 'Noch ' + fmt(missing) + ' 🪙 fehlen' : label + ' · ' + fmt(CHEST_PRICE) + ' 🪙';
+}
+function openShop() {
+  enterShowroom('shop');
+  if (show.car) { turntable.remove(show.car.root); show.car = null; }
+  show.phase = 'idle';
+  chest.visible = true;
+  chest.scale.setScalar(1);
+  chest.userData.lid.rotation.x = 0;
+  ringMat.color.copy(glow(0xffc030, 1.2));
+  ui.shopBuy.classList.remove('hidden');
+  ui.shopResult.classList.add('hidden');
+  ui.shopPanel.classList.remove('hidden');
+  setChestButton(ui.chestBtn, 'Kiste öffnen');
+  updateCoinBadges();
+  ui.shop.classList.remove('hidden');
+}
+function rollRarity() {
+  let r = Math.random();
+  for (const [key, val] of Object.entries(RARITY)) { if ((r -= val.chance) < 0) return key; }
+  return 'common';
+}
+function openChest() {
+  if (show.phase === 'shake') return;
+  if (!Wallet.spend(CHEST_PRICE)) { setChestButton(ui.chestBtn, 'Kiste öffnen'); return; }
+  const rarity = rollRarity();
+  const def = pick(CARS.filter(c => c.rarity === rarity));
+  const dup = Garage.owns(def.id);
+  if (dup) Wallet.add(RARITY[rarity].refund);   // doppelt: Münzen zurück
+  else Garage.add(def.id);
+  show.result = { def, rarity, dup };
+  chest.visible = true;
+  chest.scale.setScalar(1);
+  chest.userData.lid.rotation.x = 0;
+  displayCar(def.id, false);
+  show.car.root.visible = false;
+  flash.material.color.copy(glowCss(RARITY[rarity].color, 4));
+  show.phase = 'shake';
+  show.ct = 0;
+  ui.shopPanel.classList.add('hidden');         // während der Animation nur die Kiste zeigen
+  updateCoinBadges();
+}
+function showChestResult() {
+  const r = show.result, info = RARITY[r.rarity];
+  ui.resultRarity.textContent = info.name;
+  ui.resultRarity.style.background = info.color;
+  ui.resultName.textContent = r.def.name;
+  ui.resultInfo.textContent = r.dup
+    ? 'Schon in deiner Garage – du bekommst ' + fmt(info.refund) + ' 🪙 zurück.'
+    : 'NEU! Jetzt in deiner Garage.';
+  ui.resultInfo.style.color = r.dup ? '#ffe48a' : '#9bff4a';
+  setChestButton(ui.chestAgainBtn, 'Noch eine Kiste');
+  ui.shopBuy.classList.add('hidden');
+  ui.shopResult.classList.remove('hidden');
+  ui.shopPanel.classList.remove('hidden');
+  updateCoinBadges();
+}
+
+// ---------- Upgrades ----------
+function openUpgrades() {
+  ui.menu.classList.add('hidden');
+  renderUpgrades();
+  ui.upgrade.classList.remove('hidden');
+}
+function renderUpgrades() {
+  const levels = Upgrades.load(), coins = Wallet.get();
+  ui.upgradeList.textContent = '';
+  UPGRADES.forEach(u => {
+    const lvl = levels[u.id], max = u.prices.length;
+    const row = document.createElement('div'); row.className = 'upg';
+    const head = document.createElement('div'); head.className = 'upg-head';
+    const title = document.createElement('span'); title.textContent = u.icon + ' ' + u.name;
+    const pips = document.createElement('span'); pips.className = 'pips';
+    pips.textContent = '●'.repeat(lvl) + '○'.repeat(max - lvl);
+    head.append(title, pips);
+    const desc = document.createElement('div'); desc.className = 'upg-desc';
+    desc.textContent = u.step + ' · jetzt: ' + u.now(lvl);
+    const btn = document.createElement('button'); btn.className = 'btn green';
+    if (lvl >= max) { btn.disabled = true; btn.textContent = 'Maximal ausgebaut'; }
+    else {
+      const price = u.prices[lvl];
+      btn.disabled = coins < price;
+      btn.textContent = coins < price ? 'Noch ' + fmt(price - coins) + ' 🪙 fehlen' : 'Stufe ' + (lvl + 1) + ' kaufen · ' + fmt(price) + ' 🪙';
+      btn.addEventListener('click', () => { if (Upgrades.buy(u.id)) { updateCoinBadges(); renderUpgrades(); } });
+    }
+    row.append(head, desc, btn);
+    ui.upgradeList.appendChild(row);
+  });
+  updateCoinBadges();
+}
+
+$('garageBtn').addEventListener('click', openGarage);
+$('shopBtn').addEventListener('click', openShop);
+$('upgradeBtn').addEventListener('click', openUpgrades);
+$('garageBack').addEventListener('click', leaveShowroom);
+$('shopBack').addEventListener('click', leaveShowroom);
+$('upgradeBack').addEventListener('click', () => {
+  ui.upgrade.classList.add('hidden');
+  updateCoinBadges();
+  ui.menu.classList.remove('hidden');
+});
+ui.selectBtn.addEventListener('click', selectGarageCar);
+ui.chestBtn.addEventListener('click', openChest);
+ui.chestAgainBtn.addEventListener('click', openChest);
+updateCoinBadges();
 
 // =====================================================================
 //  STEUERUNG
@@ -1848,10 +2579,11 @@ window.addEventListener('resize', () => {
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
   composer.setSize(innerWidth, innerHeight);
+  layoutShowCam();
 });
 
 // Nur zum Testen in der Browser-Konsole (Module haben keine globalen Variablen)
-window.ZH = { state, car, active, zombies, startGame, damage, activateNitro, spawnThing, spawnZombie, LANES };
+window.ZH = { state, car, active, zombies, startGame, damage, activateNitro, spawnThing, spawnZombie, LANES, Wallet, Garage, Upgrades, show };
 
 frame();
 </script>
