@@ -35,6 +35,8 @@ Keine Figuren, Namen oder Grafiken von Subway Surfers verwenden.
 - Nasse Straße: `roughnessMap` mit Pfützen (scrollt mit der Straßen-Textur mit),
   Lichtflecken der Laternen auf dem Boden (`MAT.pool`).
 - Schatten: VSM mit Weichzeichner am PC, PCF auf dem Handy.
+- Kein Licht von vorne/vom Horizont hinzufügen: Es spiegelt sich in der nassen Straße als
+  greller Bloom-Fleck direkt vor dem Auto (wurde deshalb entfernt).
 - Alle Texturen werden zur Laufzeit auf Canvas gezeichnet, es gibt keine Bilddateien.
 - Schrift „Bungee“ (Google Fonts) für Titel und Zahlen.
 - localStorage immer über das Objekt `Store` (mit try/catch).

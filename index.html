@@ -327,10 +327,8 @@ moonLight.shadow.bias = LOW_Q ? -0.0006 : -0.0002;
 moonLight.shadow.radius = 6;          // wie stark der Schattenrand weichgezeichnet wird
 moonLight.shadow.blurSamples = 12;
 scene.add(moonLight, moonLight.target);
-// Rötlicher Schein von der brennenden Stadt am Horizont
-const glowLight = new THREE.DirectionalLight(0xff6a3a, 0.9);
-glowLight.position.set(0, 6, -60);
-scene.add(glowLight);
+// Kein eigenes Licht vom Horizont: es spiegelte sich als greller Fleck vor dem Auto
+// in der nassen Straße. Der rote Schein kommt jetzt nur noch von Himmel, Nebel und Environment Map.
 
 // =====================================================================
 //  NACHBEARBEITUNG: Bloom (Leuchten), Vignette, Bewegungsunschärfe bei Nitro
