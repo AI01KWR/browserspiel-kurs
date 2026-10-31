@@ -27,6 +27,14 @@ Keine Figuren, Namen oder Grafiken von Subway Surfers verwenden.
   (PMREM), `MeshStandardMaterial` überall (Autolack: `MeshPhysicalMaterial` mit Klarlack).
   Lichtstärken sind physikalisch (Spot/Point mit decay 2), daher große Zahlen.
   Canvas-Texturen mit Farben brauchen `colorSpace = SRGBColorSpace` (macht `canvasTex()`).
+- Nachbearbeitung über `composer` (EffectComposer): RenderPass → UnrealBloomPass
+  (threshold 1.0) → `fxPass` (Vignette + Bewegungsunschärfe bei Nitro) → OutputPass.
+  Es wird mit `composer.render()` gezeichnet, nicht mit `renderer.render()`.
+- Was leuchten soll, bekommt eine Farbe heller als Weiß über `glow(farbe, stärke)`
+  (Scheinwerfer, Laternen, Feuer, Zombie-Augen, Nitro). Fenster bleiben knapp unter der Schwelle.
+- Nasse Straße: `roughnessMap` mit Pfützen (scrollt mit der Straßen-Textur mit),
+  Lichtflecken der Laternen auf dem Boden (`MAT.pool`).
+- Schatten: VSM mit Weichzeichner am PC, PCF auf dem Handy.
 - Alle Texturen werden zur Laufzeit auf Canvas gezeichnet, es gibt keine Bilddateien.
 - Schrift „Bungee“ (Google Fonts) für Titel und Zahlen.
 - localStorage immer über das Objekt `Store` (mit try/catch).

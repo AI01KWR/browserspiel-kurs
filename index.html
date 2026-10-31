@@ -215,6 +215,11 @@
 </script>
 <script type="module">
 import * as THREE from 'three';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 // =====================================================================
 //  EINSTELLUNGEN – bestimmen das Spielgefühl.
@@ -294,7 +299,8 @@ const renderer = new THREE.WebGLRenderer({ antialias: !LOW_Q, powerPreference: '
 renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOW_Q ? 1.5 : 2));
 renderer.setSize(innerWidth, innerHeight);
 renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = LOW_Q ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+// Weiche Schatten: VSM mit Weichzeichner am PC, einfacheres PCF auf dem Handy
+renderer.shadowMap.type = LOW_Q ? THREE.PCFShadowMap : THREE.VSMShadowMap;
 // Richtige Farbdarstellung und filmischer Look
 renderer.outputColorSpace = THREE.SRGBColorSpace;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -317,12 +323,57 @@ moonLight.target.position.set(0, 0, -10);
 moonLight.castShadow = true;
 moonLight.shadow.mapSize.set(LOW_Q ? 1024 : 2048, LOW_Q ? 1024 : 2048);
 Object.assign(moonLight.shadow.camera, { left: -22, right: 22, top: 30, bottom: -30, near: 1, far: 90 });
-moonLight.shadow.bias = -0.0006;
+moonLight.shadow.bias = LOW_Q ? -0.0006 : -0.0002;
+moonLight.shadow.radius = 6;          // wie stark der Schattenrand weichgezeichnet wird
+moonLight.shadow.blurSamples = 12;
 scene.add(moonLight, moonLight.target);
 // Rötlicher Schein von der brennenden Stadt am Horizont
 const glowLight = new THREE.DirectionalLight(0xff6a3a, 0.9);
 glowLight.position.set(0, 6, -60);
 scene.add(glowLight);
+
+// =====================================================================
+//  NACHBEARBEITUNG: Bloom (Leuchten), Vignette, Bewegungsunschärfe bei Nitro
+// =====================================================================
+const composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(innerWidth, innerHeight, {
+  type: THREE.HalfFloatType,
+  samples: LOW_Q ? 0 : 4          // Kantenglättung am PC
+}));
+composer.setPixelRatio(renderer.getPixelRatio());
+composer.setSize(innerWidth, innerHeight);
+composer.addPass(new RenderPass(scene, camera));
+// Nur was heller als „weiß“ ist (threshold), fängt an zu strahlen
+const bloomPass = new UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.55, 1.0);
+composer.addPass(bloomPass);
+const fxPass = new ShaderPass({
+  uniforms: {
+    tDiffuse: { value: null },
+    uBlur: { value: 0 },           // Stärke der Bewegungsunschärfe (zur Bildmitte hin)
+    uVignette: { value: 0.35 }     // wie stark die Ränder abgedunkelt werden
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uBlur;
+    uniform float uVignette;
+    varying vec2 vUv;
+    void main() {
+      vec2 dir = vUv - 0.5;
+      vec4 col = vec4(0.0);
+      for (int i = 0; i < 10; i++) {
+        float t = float(i) / 9.0;
+        col += texture2D(tDiffuse, vUv - dir * uBlur * t);
+      }
+      col /= 10.0;
+      float v = smoothstep(0.85, 0.25, length(dir));
+      col.rgb *= mix(1.0, v, uVignette);
+      gl_FragColor = col;
+    }`
+});
+composer.addPass(fxPass);
+composer.addPass(new OutputPass());   // Tone-Mapping und sRGB ganz am Ende
 
 // =====================================================================
 //  TEXTUREN – alle werden zur Laufzeit auf ein Canvas gezeichnet
@@ -606,6 +657,8 @@ TEX.fire = canvasTex(64, 128, (g, w, h) => {
 // Realistische Materialien (PBR): roughness = wie rau, metalness = wie metallisch
 const std = (color, opts = {}) => new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.85, metalness: 0 }, opts));
 const basic = (color, opts = {}) => new THREE.MeshBasicMaterial(Object.assign({ color }, opts));
+const glow = (hex, strength) => new THREE.Color(hex).multiplyScalar(strength);
+const BULB_GLOW = 4, POOL_OPACITY = 0.22;
 const additive = { transparent: true, blending: THREE.AdditiveBlending, depthWrite: false };
 
 // =====================================================================
@@ -619,17 +672,18 @@ const MAT = {
   glass: std(0x0c1626, { roughness: 0.05, metalness: 0.9 }),
   rubber: std(0x18181b, { roughness: 0.95 }),
   rim: std(0xffffff, { map: TEX.rim, roughness: 0.35, metalness: 0.8 }),
-  headlight: basic(0xfff6d0),
-  tail: basic(0xff2a1a),
-  roofLamp: basic(0xfff2a0),
-  flameOuter: basic(0x2a7bff, Object.assign({ opacity: 0.85 }, additive)),
-  flameInner: basic(0xbff4ff, Object.assign({ opacity: 0.9 }, additive)),
+  // Leuchtende Teile sind heller als „weiß“ (glow()), damit der Bloom-Effekt sie zum Strahlen bringt
+  headlight: basic(glow(0xfff6d0, 6)),
+  tail: basic(glow(0xff2a1a, 4)),
+  roofLamp: basic(glow(0xfff2a0, 5)),
+  flameOuter: basic(glow(0x2a7bff, 3), Object.assign({ opacity: 0.85 }, additive)),
+  flameInner: basic(glow(0xbff4ff, 4), Object.assign({ opacity: 0.9 }, additive)),
   skin: ['#7fae5a', '#93c06a', '#6e9a58', '#a2b86a'].map(c => std(c, { roughness: 0.7 })),
   shirt: ['#5a6e8a', '#8a5a4a', '#6a7a4a', '#7a6a8a', '#a08a5a', '#8a8a8a'].map(c => std(0xffffff, { map: shirtTex(c), roughness: 0.95 })),
   pants: ['#3a3a4a', '#4a3a2a', '#2e3a4e', '#4a4a3a'].map(c => std(c, { roughness: 0.95 })),
   shoe: std(0x2a2018, { roughness: 0.6 }),
   hair: std(0x2a2a1a, { roughness: 0.9 }),
-  eye: basic(0xff2a10),
+  eye: basic(glow(0xff2a10, 6)),
   mouth: std(0x2a0a0a),
   wood: std(0xffffff, { map: TEX.wood, roughness: 0.9 }),
   woodDark: std(0x5a3a22, { roughness: 0.9 }),
@@ -645,13 +699,15 @@ const MAT = {
   bark: std(0x3a2a20, { roughness: 1 }),
   curb: std(0x6a6670, { roughness: 0.95 }),
   ground: std(0x17141a, { roughness: 1 }),
-  fire: new THREE.SpriteMaterial(Object.assign({ map: TEX.fire, color: 0xffa040 }, additive)),
+  fire: new THREE.SpriteMaterial(Object.assign({ map: TEX.fire, color: glow(0xffa040, 3) }, additive)),
   goo: [0x7dff3a, 0x4ae020, 0xb4ff6a].map(c => basic(c)),
   gold: [basic(0xffe066), basic(0xffb020)],
   repair: [basic(0xff5a4a), basic(0xffffff)],
   // Laternen: eine ruhige und zwei flackernde Varianten
-  bulb: [0, 1, 2].map(() => basic(0xffd890)),
-  cone: [0, 1, 2].map(() => basic(0xffc870, Object.assign({ opacity: 0.07, side: THREE.DoubleSide }, additive)))
+  bulb: [0, 1, 2].map(() => basic(glow(0xffd890, BULB_GLOW))),
+  cone: [0, 1, 2].map(() => basic(0xffc870, Object.assign({ opacity: 0.07, side: THREE.DoubleSide }, additive))),
+  // Lichtfleck der Laterne auf dem nassen Boden
+  pool: [0, 1, 2].map(() => basic(0xffb860, Object.assign({ map: TEX.soft, opacity: POOL_OPACITY }, additive)))
 };
 
 // Wiederverwendbare Bauteile
@@ -762,17 +818,32 @@ scene.add(skyGroup);
 const ROAD_LEN = 240;
 const scrollTextures = [];
 {
+  // Nasse Straße: eine Rauheits-Karte (hell = rau, dunkel = glatt). Pfützen sind fast spiegelglatt.
+  const wetTex = canvasTex(256, 512, (g, w, h) => {
+    g.fillStyle = 'rgb(120,120,120)'; g.fillRect(0, 0, w, h);
+    speckle(g, w, h, 3000, ['rgb(95,95,95)', 'rgb(150,150,150)'], 1, 3);
+    for (let i = 0; i < 9; i++) {
+      const x = rand(20, w - 20), y = rand(20, h - 20), r = rand(14, 40);
+      const gr = g.createRadialGradient(x, y, 0, x, y, r);
+      gr.addColorStop(0, 'rgb(15,15,15)'); gr.addColorStop(0.7, 'rgb(30,30,30)'); gr.addColorStop(1, 'rgba(120,120,120,0)');
+      g.fillStyle = gr;
+      g.beginPath(); g.ellipse(x, y, r, r * rand(0.4, 0.9), rand(0, 3), 0, Math.PI * 2); g.fill();
+    }
+  });
+  wetTex.colorSpace = THREE.NoColorSpace;     // keine Farbe, sondern Messwerte
   TEX.road.repeat.set(1, ROAD_LEN / ROAD_TILE);
-  const road = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, ROAD_LEN), std(0xffffff, { map: TEX.road, roughness: 0.75 }));
+  wetTex.repeat.copy(TEX.road.repeat);
+  const roadMat = std(0xb8b8c0, { map: TEX.road, roughnessMap: wetTex, roughness: 1, metalness: 0.15, envMapIntensity: 1.6 });
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, ROAD_LEN), roadMat);
   road.rotation.x = -Math.PI / 2;
   road.position.set(0, 0, 20 - ROAD_LEN / 2);
   road.receiveShadow = true;
   scene.add(road);
-  scrollTextures.push({ tex: TEX.road, tile: ROAD_TILE });
+  scrollTextures.push({ tex: TEX.road, tile: ROAD_TILE }, { tex: wetTex, tile: ROAD_TILE });
 
   const WALK_W = 3.2;
   TEX.walk.repeat.set(1, ROAD_LEN / WALK_W);
-  const walkMat = std(0xffffff, { map: TEX.walk, roughness: 0.9 });
+  const walkMat = std(0xd0d0d8, { map: TEX.walk, roughness: 0.55, envMapIntensity: 1.2 });
   [-1, 1].forEach(side => {
     const walk = new THREE.Mesh(new THREE.PlaneGeometry(WALK_W, ROAD_LEN), walkMat);
     walk.rotation.x = -Math.PI / 2;
@@ -814,7 +885,7 @@ function placeBuilding(b) {
     const f = pick(FACADES);
     const map = f.map.clone(), emissiveMap = f.emissiveMap.clone();
     map.needsUpdate = emissiveMap.needsUpdate = true;
-    const mesh = new THREE.Mesh(UNIT_BOX, std(0xffffff, { map, emissiveMap, emissive: 0xffffff, emissiveIntensity: 1.2, roughness: 0.8 }));
+    const mesh = new THREE.Mesh(UNIT_BOX, std(0xffffff, { map, emissiveMap, emissive: 0xffffff, emissiveIntensity: 0.95, roughness: 0.8 }));
     scene.add(mesh);
     const b = { mesh, side, z: 0, len: 0 };
     placeBuilding(b);
@@ -825,6 +896,7 @@ function placeBuilding(b) {
 // =====================================================================
 //  DEKO AM STRASSENRAND: Laternen, Bäume, brennende Fässer, Wracks
 // =====================================================================
+const POOL_GEO = new THREE.CircleGeometry(2.6, 24);
 function makeLamp(side) {
   const g = new THREE.Group();
   const pole = cyl(0.08, 0.11, 5.6, MAT.pole, 8); pole.position.y = 2.8; g.add(pole);
@@ -835,6 +907,10 @@ function makeLamp(side) {
   const cone = new THREE.Mesh(new THREE.ConeGeometry(1.7, 5.3, 16, 1, true), MAT.cone[v]);
   cone.position.set(-side * 1.55, 2.72, 0);
   g.add(cone);
+  const pool = new THREE.Mesh(POOL_GEO, MAT.pool[v]);
+  pool.rotation.x = -Math.PI / 2;
+  pool.position.set(-side * 1.55, -0.15, 0);    // knapp über der Straße (die Gruppe steht auf Gehweg-Höhe)
+  g.add(pool);
   return g;
 }
 function makeTree() {
@@ -1538,8 +1614,9 @@ function updateFx(dt) {
   // flackernde Laternen
   for (let i = 1; i <= 2; i++) {
     const on = Math.sin(clockTime * (7 + i * 5)) + Math.sin(clockTime * (13 + i * 3)) > -1.2 || Math.random() < 0.3;
-    MAT.bulb[i].color.setHex(on ? 0xffd890 : 0x332a20);
+    MAT.bulb[i].color.setHex(on ? 0xffd890 : 0x332a20).multiplyScalar(on ? BULB_GLOW : 1);
     MAT.cone[i].opacity = on ? 0.07 : 0;
+    MAT.pool[i].opacity = on ? POOL_OPACITY : 0;
   }
   // brennende Fässer
   for (const s of scenery) {
@@ -1570,6 +1647,12 @@ function updateCamera(dt) {
   camera.position.set(car.x * 0.55 + rand(-s, s), 4.4 + car.y * 0.45 + rand(-s, s), 8.2);
   camera.lookAt(car.x * 0.7, 1.2 + car.y * 0.35, -10);
   skyGroup.position.set(camera.position.x, 0, camera.position.z);
+
+  // Nitro: Bewegungsunschärfe und stärkere Vignette
+  const nitroOn = state.nitroTime > 0 ? 1 : 0;
+  const u = fxPass.uniforms;
+  u.uBlur.value = lerp(u.uBlur.value, nitroOn * 0.035, Math.min(1, dt * 5));
+  u.uVignette.value = lerp(u.uVignette.value, 0.35 + nitroOn * 0.4, Math.min(1, dt * 5));
 }
 
 const hudCache = {};
@@ -1633,7 +1716,7 @@ function frame() {
   requestAnimationFrame(frame);
   const dt = Math.min(clock.getDelta(), 0.05);
   update(dt);
-  renderer.render(scene, camera);
+  composer.render();
 }
 
 // =====================================================================
@@ -1758,6 +1841,7 @@ window.addEventListener('resize', () => {
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(innerWidth, innerHeight);
+  composer.setSize(innerWidth, innerHeight);
 });
 
 // Nur zum Testen in der Browser-Konsole (Module haben keine globalen Variablen)
