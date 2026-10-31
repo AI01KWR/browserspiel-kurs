@@ -1,21 +1,1720 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Unser Browserspiel</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #1e1e2e;
-      color: #f5f5f5;
-      text-align: center;
-      padding: 40px 16px;
-    }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Zombie Highway</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bungee&display=swap" rel="stylesheet">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    width: 100%; height: 100%; overflow: hidden;
+    background: #07060c; color: #fff;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    user-select: none; -webkit-user-select: none; touch-action: none;
+  }
+  #game { position: fixed; inset: 0; }
+  #game canvas { display: block; }
+  .bungee { font-family: "Bungee", system-ui, sans-serif; }
+  .hidden { display: none !important; }
+
+  /* Roter Rand bei Treffern */
+  #flash {
+    position: fixed; inset: 0; pointer-events: none; opacity: 0;
+    background: radial-gradient(ellipse at center, rgba(255,0,0,0) 35%, rgba(255,0,0,.8) 100%);
+  }
+
+  /* ---------- Anzeige im Spiel (HUD) ---------- */
+  #hud { position: fixed; inset: 0; pointer-events: none; }
+  .bars { position: absolute; left: 16px; top: 14px; width: min(260px, 44vw); }
+  .bar-label {
+    display: flex; justify-content: space-between;
+    font-family: "Bungee", sans-serif; font-size: 14px; margin-bottom: 4px;
+    text-shadow: 0 2px 0 #000;
+  }
+  .bar {
+    height: 16px; margin-bottom: 10px; overflow: hidden;
+    border: 3px solid #111; border-radius: 10px; background: rgba(0,0,0,.55);
+    box-shadow: 0 3px 0 rgba(0,0,0,.5);
+  }
+  .bar > div { height: 100%; width: 100%; border-radius: 6px; transition: width .15s; }
+  #hpFill { background: linear-gradient(#7dff6a, #2fbf2a); }
+  #hpFill.mid { background: linear-gradient(#ffd84a, #e0a000); }
+  #hpFill.low { background: linear-gradient(#ff6a5a, #c4160c); }
+  #nitroFill { background: linear-gradient(#7fe6ff, #1c7cff); }
+  #nitroBar.full { animation: pulse .6s infinite alternate; }
+  @keyframes pulse { from { box-shadow: 0 0 4px #4cf; } to { box-shadow: 0 0 18px #4cf; } }
+  .stats {
+    position: absolute; right: 16px; top: 12px; text-align: right;
+    font-family: "Bungee", sans-serif; text-shadow: 0 3px 0 #000;
+  }
+  #score { font-size: clamp(26px, 6vw, 42px); line-height: 1; }
+  .mini { font-size: 15px; margin-top: 6px; color: #ffe48a; }
+  #toast {
+    position: absolute; left: 0; right: 0; top: 26%; text-align: center;
+    font-family: "Bungee", sans-serif; font-size: clamp(22px, 5vw, 38px);
+    text-shadow: 0 4px 0 #000; opacity: 0; transition: opacity .25s;
+  }
+  #nitroBtn {
+    position: fixed; right: 18px; bottom: 22px; width: 84px; height: 84px;
+    border-radius: 50%; border: 4px solid #111;
+    background: radial-gradient(circle at 35% 30%, #8ff0ff, #1c6cff);
+    font-family: "Bungee", sans-serif; font-size: 15px; color: #fff;
+    text-shadow: 0 2px 0 #003; box-shadow: 0 5px 0 #000; opacity: .45;
+  }
+  #nitroBtn.ready { opacity: 1; animation: pulse .6s infinite alternate; }
+
+  /* ---------- Menüs ---------- */
+  .overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    padding: 16px;
+    background: radial-gradient(ellipse at center, rgba(10,5,15,.3), rgba(5,2,8,.85));
+  }
+  .panel {
+    width: min(440px, 100%); max-height: 100%; overflow: auto; touch-action: pan-y;
+    text-align: center; padding: 22px 20px;
+    background: rgba(20,14,24,.9); border: 4px solid #111; border-radius: 22px;
+    box-shadow: 0 8px 0 #000, 0 0 40px rgba(255,60,20,.25);
+  }
+  h1 {
+    font-family: "Bungee", sans-serif; font-size: clamp(34px, 9vw, 54px); line-height: 1.02;
+    color: #ff4a2a; text-shadow: 0 4px 0 #3a0700, 0 0 24px rgba(255,80,20,.6);
+  }
+  h1 span { display: block; color: #9bff4a; text-shadow: 0 4px 0 #1b3a00, 0 0 24px rgba(120,255,40,.5); }
+  h2 {
+    font-family: "Bungee", sans-serif; font-size: 28px; margin-bottom: 10px;
+    color: #ff4a2a; text-shadow: 0 3px 0 #000;
+  }
+  .sub { margin: 10px 0 18px; color: #d9cfe0; font-size: 15px; }
+  .btn {
+    display: block; width: 100%; margin: 10px 0; padding: 14px; cursor: pointer;
+    font-family: "Bungee", sans-serif; font-size: 20px; color: #fff;
+    border: 3px solid #111; border-radius: 14px; box-shadow: 0 5px 0 #000;
+    background: linear-gradient(#ff6a3a, #d42a10); touch-action: manipulation;
+  }
+  .btn:active { transform: translateY(3px); box-shadow: 0 2px 0 #000; }
+  .btn:disabled { opacity: .5; }
+  .btn.alt { background: linear-gradient(#5a4a6a, #3a2c48); }
+  .btn.green { background: linear-gradient(#7ddc3a, #3b9a12); }
+  .controls {
+    margin-top: 14px; padding: 10px 14px; text-align: left; line-height: 1.7;
+    font-size: 14px; color: #cfc6d8; background: rgba(0,0,0,.3); border-radius: 12px;
+  }
+  kbd {
+    font-family: inherit; font-size: 13px; color: #fff; padding: 0 6px;
+    background: #2c2236; border: 1px solid #554466; border-bottom-width: 3px; border-radius: 5px;
+  }
+  .big { font-family: "Bungee", sans-serif; font-size: 46px; color: #ffe48a; text-shadow: 0 4px 0 #000; }
+  .statgrid { display: flex; justify-content: space-around; margin: 10px 0 6px; font-size: 14px; color: #cfc6d8; }
+  .statgrid b { display: block; font-family: "Bungee", sans-serif; font-size: 20px; color: #fff; font-weight: normal; }
+  #nameBox { margin: 12px 0; padding: 12px; border-radius: 12px; background: rgba(155,255,74,.1); border: 2px dashed #9bff4a; }
+  #nameInput {
+    width: 100%; margin-top: 8px; padding: 12px; text-align: center;
+    font-family: "Bungee", sans-serif; font-size: 18px;
+    border: 3px solid #111; border-radius: 10px;
+    user-select: text; -webkit-user-select: text;
+  }
+  table { width: 100%; border-collapse: collapse; margin: 8px 0 6px; font-size: 16px; }
+  td { padding: 7px 6px; border-bottom: 1px solid rgba(255,255,255,.08); text-align: left; }
+  td:first-child { font-family: "Bungee", sans-serif; width: 44px; color: #ff8a5a; }
+  td:last-child { text-align: right; font-family: "Bungee", sans-serif; }
+  tr.me td { background: rgba(155,255,74,.18); }
+  .empty { color: #a99db5; padding: 16px 0; }
+  .touch-only { display: none; }
+  @media (pointer: coarse) {
+    .touch-only { display: block; }
+    .key-only { display: none; }
+  }
+</style>
 </head>
 <body>
-  <h1>🎮 Unser Browserspiel</h1>
-  <p>Hier entsteht heute Abend unser Spiel. Bald geht's los!</p>
+
+<div id="game"></div>
+<div id="flash"></div>
+
+<!-- Anzeige während der Fahrt -->
+<div id="hud" class="hidden">
+  <div class="bars">
+    <div class="bar-label"><span>❤ Leben</span><span id="hpText">100</span></div>
+    <div class="bar"><div id="hpFill"></div></div>
+    <div class="bar-label"><span>⚡ Nitro</span><span class="key-only">E</span></div>
+    <div class="bar" id="nitroBar"><div id="nitroFill" style="width:0%"></div></div>
+  </div>
+  <div class="stats">
+    <div id="score">0</div>
+    <div class="mini">🪙 <span id="coinText">0</span> &nbsp; 🧟 <span id="zombieText">0</span></div>
+  </div>
+  <div id="toast"></div>
+</div>
+<button id="nitroBtn" class="hidden">Nitro</button>
+
+<!-- Startmenü -->
+<div id="menu" class="overlay">
+  <div class="panel">
+    <h1>Zombie<span>Highway</span></h1>
+    <p class="sub">Brich durch die Zombie-Stadt! Ausweichen – oder den Schaden in Kauf nehmen?</p>
+    <button class="btn" id="startBtn">Losfahren</button>
+    <button class="btn alt" id="boardBtn">Rangliste</button>
+    <div class="controls key-only">
+      <kbd>←</kbd> <kbd>→</kbd> oder <kbd>A</kbd> <kbd>D</kbd> Spur wechseln<br>
+      <kbd>Leertaste</kbd> <kbd>↑</kbd> <kbd>W</kbd> Springen<br>
+      <kbd>E</kbd> Nitro, wenn die Leiste voll ist<br>
+      🧰 Rote Werkzeugkiste repariert dein Auto
+    </div>
+    <div class="controls touch-only">
+      👉 Links/rechts wischen: Spur wechseln<br>
+      👆 Nach oben wischen: Springen<br>
+      👇 Nach unten wischen oder Knopf: Nitro<br>
+      🧰 Rote Werkzeugkiste repariert dein Auto
+    </div>
+  </div>
+</div>
+
+<!-- Rangliste -->
+<div id="boardScreen" class="overlay hidden">
+  <div class="panel">
+    <h2>🏆 Rangliste</h2>
+    <p class="sub" style="margin:0 0 6px">Top 10 auf diesem Gerät</p>
+    <table><tbody id="boardBody"></tbody></table>
+    <button class="btn alt" id="boardBack">Zurück</button>
+  </div>
+</div>
+
+<!-- Game Over -->
+<div id="overScreen" class="overlay hidden">
+  <div class="panel">
+    <h2>Game Over</h2>
+    <div class="big" id="finalScore">0</div>
+    <div class="statgrid">
+      <div><b id="statDist">0</b>Meter</div>
+      <div><b id="statCoins">0</b>Münzen</div>
+      <div><b id="statZombies">0</b>Zombies</div>
+    </div>
+    <div id="nameBox" class="hidden">
+      <div class="bungee" style="color:#9bff4a">Neuer Top-10-Platz!</div>
+      <input id="nameInput" maxlength="12" placeholder="Dein Name" autocomplete="off" spellcheck="false">
+      <button class="btn green" id="saveBtn">Eintragen</button>
+    </div>
+    <p class="sub" id="overInfo"></p>
+    <button class="btn" id="againBtn">Nochmal</button>
+    <button class="btn alt" id="overBoardBtn">Rangliste</button>
+    <button class="btn alt" id="menuBtn">Menü</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+
+// =====================================================================
+//  EINSTELLUNGEN – bestimmen das Spielgefühl.
+//  Nicht ohne Absprache ändern (siehe CLAUDE.md).
+// =====================================================================
+const LANES = [-2.6, 0, 2.6];          // x-Position der 3 Spuren
+const SPEED_START = 20;                // Startgeschwindigkeit
+const SPEED_MAX = 48;                  // Höchstgeschwindigkeit
+const RAMP_TIME = 120;                 // Sekunden, bis die volle Schwierigkeit erreicht ist
+const MAX_HP = 100;
+const DAMAGE = { zombie: 10, fence: 15, crates: 20, wreck: 35, barrier: 50 };
+const COIN_POINTS = 10, COIN_NITRO = 4;
+const ZOMBIE_POINTS = 5, ZOMBIE_NITRO = 3;
+const REPAIR_HP = 25;
+const NITRO_TIME = 3.5, NITRO_SPEED = 1.6, NITRO_DAMAGE = 0.5;   // halber Schaden, nicht unverwundbar
+const JUMP_VEL = 9, RAMP_JUMP_VEL = 12.5, GRAVITY = 25;
+const RAMP_LEN = 3.5, RAMP_H = 1.0;
+const SPAWN_Z = -130;                  // hier tauchen neue Dinge auf (weit vorne im Nebel)
+const DESPAWN_Z = 14;                  // hinter der Kamera wird aufgeräumt
+const NAME_KEY = 'zombie-highway-name';
+
+// Kleine Helfer
+const rand = (a, b) => a + Math.random() * (b - a);
+const randInt = (a, b) => Math.floor(rand(a, b + 1));
+const pick = arr => arr[Math.floor(Math.random() * arr.length)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+
+// =====================================================================
+//  SPEICHERN (localStorage, immer mit try/catch)
+// =====================================================================
+const Store = {
+  get(key, fallback) {
+    try {
+      const v = localStorage.getItem(key);
+      return v === null ? fallback : JSON.parse(v);
+    } catch (e) { return fallback; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch (e) { /* z. B. privater Modus */ }
+  }
+};
+
+// Rangliste. Für eine spätere Online-Rangliste nur load() und submit() ersetzen.
+// Beide geben ein Promise zurück, damit der Tausch gegen einen Server einfach bleibt.
+const Leaderboard = {
+  KEY: 'zombie-highway-board',
+  SIZE: 10,
+  // Liefert die Top 10, beste zuerst.
+  async load() {
+    const list = Store.get(this.KEY, []);
+    if (!Array.isArray(list)) return [];
+    return list
+      .filter(e => e && typeof e.score === 'number' && typeof e.name === 'string')
+      .sort((a, b) => b.score - a.score)
+      .slice(0, this.SIZE);
+  },
+  // Trägt ein Ergebnis ein und liefert den Platz (0 = erster) oder -1.
+  async submit(entry) {
+    const list = await this.load();
+    list.push(entry);
+    list.sort((a, b) => b.score - a.score);
+    const top = list.slice(0, this.SIZE);
+    Store.set(this.KEY, top);
+    return top.indexOf(entry);
+  }
+};
+
+// =====================================================================
+//  GRUNDGERÜST: Renderer, Szene, Kamera, Licht
+// =====================================================================
+const isTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+// Auf Handys etwas Qualität sparen
+const LOW_Q = window.matchMedia('(pointer: coarse)').matches || Math.min(innerWidth, innerHeight) < 600;
+
+const renderer = new THREE.WebGLRenderer({ antialias: !LOW_Q, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, LOW_Q ? 1.5 : 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = LOW_Q ? THREE.PCFShadowMap : THREE.PCFSoftShadowMap;
+document.getElementById('game').appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+const FOG_COLOR = 0x1e101c;
+scene.background = new THREE.Color(FOG_COLOR);
+scene.fog = new THREE.Fog(FOG_COLOR, 28, 135);
+
+const camera = new THREE.PerspectiveCamera(64, innerWidth / innerHeight, 0.1, 700);
+
+scene.add(new THREE.HemisphereLight(0x8a96d0, 0x2a1418, 0.62));
+// Mondlicht mit Schatten
+const moonLight = new THREE.DirectionalLight(0xb4c0ff, 0.65);
+moonLight.position.set(-18, 30, -6);
+moonLight.target.position.set(0, 0, -10);
+moonLight.castShadow = true;
+moonLight.shadow.mapSize.set(LOW_Q ? 1024 : 2048, LOW_Q ? 1024 : 2048);
+Object.assign(moonLight.shadow.camera, { left: -22, right: 22, top: 30, bottom: -30, near: 1, far: 90 });
+moonLight.shadow.bias = -0.0006;
+scene.add(moonLight, moonLight.target);
+// Rötlicher Schein von der brennenden Stadt am Horizont
+const glowLight = new THREE.DirectionalLight(0xff6a3a, 0.3);
+glowLight.position.set(0, 6, -60);
+scene.add(glowLight);
+
+// =====================================================================
+//  TEXTUREN – alle werden zur Laufzeit auf ein Canvas gezeichnet
+// =====================================================================
+function makeCanvas(w, h, draw) {
+  const c = document.createElement('canvas');
+  c.width = w; c.height = h;
+  draw(c.getContext('2d'), w, h);
+  return c;
+}
+function canvasTex(w, h, draw) {
+  const t = new THREE.CanvasTexture(makeCanvas(w, h, draw));
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = 4;
+  return t;
+}
+function speckle(g, w, h, count, colors, sMin, sMax) {
+  for (let i = 0; i < count; i++) {
+    g.fillStyle = pick(colors);
+    const s = rand(sMin, sMax);
+    g.fillRect(Math.random() * w, Math.random() * h, s, s);
+  }
+}
+function crackLines(g, w, h, count, color, width) {
+  g.strokeStyle = color; g.lineWidth = width;
+  for (let i = 0; i < count; i++) {
+    let x = rand(0, w), y = rand(0, h);
+    g.beginPath(); g.moveTo(x, y);
+    const n = randInt(4, 10);
+    for (let k = 0; k < n; k++) { x += rand(-w * 0.06, w * 0.06); y += rand(-h * 0.04, h * 0.04); g.lineTo(x, y); }
+    g.stroke();
+  }
+}
+
+const TEX = {};
+const ROAD_W = 8.6, ROAD_TILE = 17.2;
+
+// Straße mit Rissen, Ölflecken und abgenutzten Markierungen
+TEX.road = canvasTex(512, 1024, (g, w, h) => {
+  g.fillStyle = '#2a2930'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, 9000, ['#323139', '#24232a', '#3a3842', '#1f1e24'], 1, 3);
+  for (let i = 0; i < 6; i++) {               // geflickte Stellen
+    g.fillStyle = 'rgba(12,12,18,.35)';
+    g.fillRect(rand(40, w - 160), rand(0, h - 120), rand(60, 150), rand(40, 120));
+  }
+  for (let i = 0; i < 6; i++) {               // Ölflecken
+    const x = rand(60, w - 60), y = rand(40, h - 40), r = rand(18, 48);
+    const gr = g.createRadialGradient(x, y, 2, x, y, r);
+    gr.addColorStop(0, 'rgba(4,4,8,.9)');
+    gr.addColorStop(0.6, 'rgba(40,20,60,.4)');
+    gr.addColorStop(1, 'rgba(0,0,0,0)');
+    g.fillStyle = gr;
+    g.beginPath(); g.ellipse(x, y, r, r * rand(0.5, 1), rand(0, 3), 0, Math.PI * 2); g.fill();
+  }
+  const laneX = x => (x + ROAD_W / 2) / ROAD_W * w;
+  g.fillStyle = 'rgba(235,230,210,.85)';       // Spurmarkierungen (gestrichelt)
+  [laneX(-1.3), laneX(1.3)].forEach(x => { for (let y = 0; y < h; y += 512) g.fillRect(x - 6, y + 40, 12, 230); });
+  g.fillStyle = 'rgba(230,190,60,.7)';         // Randlinien
+  g.fillRect(14, 0, 9, h); g.fillRect(w - 23, 0, 9, h);
+  for (let i = 0; i < 1600; i++) {            // Markierungen abnutzen
+    const x = pick([laneX(-1.3), laneX(1.3), 18, w - 18]) + rand(-8, 8);
+    g.fillStyle = pick(['#2a2930', '#24232a', '#302f36']);
+    g.fillRect(x, rand(0, h), rand(2, 6), rand(2, 9));
+  }
+  crackLines(g, w, h, 10, 'rgba(8,8,10,.9)', 2);
+});
+
+// Gehweg aus Betonplatten
+TEX.walk = canvasTex(256, 256, (g, w, h) => {
+  g.fillStyle = '#4a4650'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, 2500, ['#524e58', '#423e48', '#57535d'], 1, 3);
+  g.strokeStyle = '#2e2b33'; g.lineWidth = 3;
+  for (let i = 0; i <= 2; i++) {
+    g.beginPath(); g.moveTo(0, i * 128); g.lineTo(w, i * 128); g.stroke();
+    g.beginPath(); g.moveTo(i * 128, 0); g.lineTo(i * 128, h); g.stroke();
+  }
+  crackLines(g, w, h, 3, 'rgba(20,18,24,.8)', 1.5);
+  for (let i = 0; i < 3; i++) {
+    g.fillStyle = 'rgba(20,15,20,.3)';
+    g.beginPath(); g.arc(rand(0, w), rand(0, h), rand(8, 22), 0, Math.PI * 2); g.fill();
+  }
+});
+
+// Hauswand mit Fenstern. Beleuchtete Fenster kommen zusätzlich in eine Leucht-Textur.
+function facadeTextures(wall) {
+  const lit = [];
+  const map = canvasTex(256, 512, (g, w, h) => {
+    g.fillStyle = wall; g.fillRect(0, 0, w, h);
+    speckle(g, w, h, 1500, ['rgba(0,0,0,.18)', 'rgba(255,255,255,.05)'], 1, 4);
+    for (let row = 0; row < 8; row++) {
+      g.fillStyle = 'rgba(0,0,0,.35)'; g.fillRect(0, row * 64 + 58, w, 4);
+      for (let col = 0; col < 4; col++) {
+        const x = col * 64 + 12, y = row * 64 + 12;
+        const r = Math.random();
+        if (r < 0.16) { lit.push([x, y]); g.fillStyle = '#d8a850'; }
+        else if (r < 0.26) { g.fillStyle = '#050508'; }   // kaputt
+        else { g.fillStyle = '#15141d'; }
+        g.fillRect(x, y, 40, 38);
+        g.fillStyle = 'rgba(120,130,170,.12)'; g.fillRect(x + 4, y + 4, 10, 30);
+      }
+    }
+    for (let i = 0; i < 4; i++) {             // Rußspuren
+      const x = rand(0, w), y = rand(0, h);
+      const gr = g.createLinearGradient(x, y + 80, x, y - 40);
+      gr.addColorStop(0, 'rgba(0,0,0,.5)'); gr.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = gr; g.fillRect(x - 20, y - 40, 40, 120);
+    }
+  });
+  const emissiveMap = canvasTex(256, 512, (g, w, h) => {
+    g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+    lit.forEach(([x, y]) => {
+      g.fillStyle = pick(['#ffcf6a', '#ffb347', '#ffe9a8', '#ff9a4a']);
+      g.fillRect(x, y, 40, 38);
+    });
+  });
+  return { map, emissiveMap };
+}
+const FACADES = ['#3e3640', '#463c36', '#343a44', '#4a4246', '#3a3a34'].map(facadeTextures);
+
+// Kleidung der Zombies, zerrissen
+function shirtTex(color) {
+  return canvasTex(64, 64, (g, w, h) => {
+    g.fillStyle = color; g.fillRect(0, 0, w, h);
+    speckle(g, w, h, 140, ['rgba(0,0,0,.18)', 'rgba(255,255,255,.08)'], 1, 3);
+    for (let i = 0; i < 3; i++) {
+      g.fillStyle = 'rgba(50,70,20,.35)';
+      g.beginPath(); g.ellipse(rand(0, w), rand(0, h), rand(4, 10), rand(3, 7), rand(0, 3), 0, Math.PI * 2); g.fill();
+    }
+    g.fillStyle = '#5f8a44';                    // Löcher, durch die grüne Haut schaut
+    for (let i = 0; i < 3; i++) {
+      const cx = rand(8, w - 8), cy = rand(8, h - 20);
+      g.beginPath();
+      for (let k = 0; k < 7; k++) {
+        const a = k / 7 * Math.PI * 2, r = rand(2, 7);
+        g.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r);
+      }
+      g.fill();
+    }
+    g.beginPath(); g.moveTo(0, h);              // zerfetzter Saum
+    for (let x = 0; x <= w; x += 6) g.lineTo(x, h - rand(2, 14));
+    g.lineTo(w, h); g.fill();
+  });
+}
+
+TEX.wood = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#8a6440'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(60,35,15,.6)'; g.lineWidth = 1;
+  for (let i = 0; i < 40; i++) {
+    const x = rand(0, w);
+    g.beginPath(); g.moveTo(x, 0); g.bezierCurveTo(x + rand(-6, 6), h / 3, x + rand(-6, 6), h * 2 / 3, x, h); g.stroke();
+  }
+  speckle(g, w, h, 200, ['rgba(0,0,0,.2)'], 1, 3);
+});
+
+TEX.crate = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#a8743c'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = 'rgba(70,40,15,.55)'; g.lineWidth = 2;
+  for (let y = 0; y < h; y += 21) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+  g.strokeStyle = '#6a4220'; g.lineWidth = 14;
+  g.strokeRect(7, 7, w - 14, h - 14);
+  g.beginPath(); g.moveTo(10, 10); g.lineTo(w - 10, h - 10); g.stroke();
+  g.fillStyle = '#2a2a2a';
+  [[12, 12], [w - 12, 12], [12, h - 12], [w - 12, h - 12]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 2.5, 0, 7); g.fill(); });
+  speckle(g, w, h, 150, ['rgba(0,0,0,.2)'], 1, 3);
+});
+
+TEX.rust = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#6a6c72'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, 600, ['#5a5c62', '#77797f'], 1, 3);
+  for (let i = 0; i < 14; i++) {
+    g.fillStyle = pick(['rgba(140,70,25,.75)', 'rgba(100,50,20,.7)', 'rgba(160,90,40,.5)']);
+    g.beginPath(); g.ellipse(rand(0, w), rand(0, h), rand(5, 20), rand(4, 14), rand(0, 3), 0, Math.PI * 2); g.fill();
+  }
+  crackLines(g, w, h, 5, 'rgba(30,30,30,.7)', 1);
+});
+
+TEX.concrete = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#b8b4aa'; g.fillRect(0, 0, w, h);
+  speckle(g, w, h, 1200, ['#a8a49a', '#c4c0b6', '#9a968c'], 1, 3);
+  crackLines(g, w, h, 4, 'rgba(60,60,60,.6)', 1);
+});
+
+TEX.stripes = canvasTex(256, 64, (g, w, h) => {
+  g.fillStyle = '#e8e4da'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#d42a1a';
+  for (let x = -h; x < w + h; x += 48) {
+    g.beginPath(); g.moveTo(x, h); g.lineTo(x + 24, h); g.lineTo(x + 24 + h, 0); g.lineTo(x + h, 0); g.fill();
+  }
+  speckle(g, w, h, 500, ['rgba(60,50,40,.35)'], 1, 4);
+});
+
+TEX.ramp = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#f2c21a'; g.fillRect(0, 0, w, h);
+  g.strokeStyle = '#151515'; g.lineWidth = 14; g.lineJoin = 'miter';
+  for (let y = 30; y < h + 40; y += 64) {     // Pfeile zeigen nach vorne
+    g.beginPath(); g.moveTo(14, y + 28); g.lineTo(w / 2, y - 6); g.lineTo(w - 14, y + 28); g.stroke();
+  }
+  speckle(g, w, h, 400, ['rgba(90,60,0,.35)', 'rgba(242,194,26,1)'], 1, 4);
+});
+
+TEX.kit = canvasTex(128, 80, (g, w, h) => {
+  g.fillStyle = '#d42a1a'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#a81808'; g.fillRect(0, h - 14, w, 14);
+  g.save(); g.translate(w / 2, h / 2 - 4); g.rotate(-0.7);   // Schraubenschlüssel
+  g.fillStyle = '#fff';
+  g.fillRect(-26, -5, 44, 10);
+  g.beginPath(); g.arc(22, 0, 13, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#d42a1a'; g.fillRect(22, -5, 16, 10);
+  g.restore();
+});
+
+TEX.rim = canvasTex(128, 128, (g, w, h) => {
+  g.fillStyle = '#18181c'; g.fillRect(0, 0, w, h);
+  g.fillStyle = '#b8bcc4'; g.beginPath(); g.arc(64, 64, 40, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#3a3c44'; g.lineWidth = 9;
+  for (let i = 0; i < 5; i++) {
+    const a = i / 5 * Math.PI * 2;
+    g.beginPath(); g.moveTo(64, 64); g.lineTo(64 + Math.cos(a) * 38, 64 + Math.sin(a) * 38); g.stroke();
+  }
+  g.fillStyle = '#e8ecf0'; g.beginPath(); g.arc(64, 64, 10, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#d42418'; g.beginPath(); g.arc(64, 64, 4, 0, Math.PI * 2); g.fill();
+});
+
+// Weicher runder Punkt (Asche, Rauch)
+TEX.soft = canvasTex(64, 64, (g, w, h) => {
+  const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32);
+  gr.addColorStop(0, 'rgba(255,255,255,1)');
+  gr.addColorStop(0.4, 'rgba(255,255,255,.5)');
+  gr.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = gr; g.fillRect(0, 0, w, h);
+});
+
+TEX.fire = canvasTex(64, 128, (g, w, h) => {
+  const gr = g.createRadialGradient(32, 92, 2, 32, 80, 60);
+  gr.addColorStop(0, 'rgba(255,255,220,1)');
+  gr.addColorStop(0.25, 'rgba(255,200,60,.95)');
+  gr.addColorStop(0.55, 'rgba(255,90,20,.6)');
+  gr.addColorStop(1, 'rgba(255,40,0,0)');
+  g.fillStyle = gr;
+  g.beginPath(); g.moveTo(32, 4);
+  g.bezierCurveTo(60, 50, 64, 100, 32, 124);
+  g.bezierCurveTo(0, 100, 4, 50, 32, 4);
+  g.fill();
+});
+
+// Kleine Verlaufstextur für den Comic-Look (harte Schattenstufen)
+const gradientMap = new THREE.CanvasTexture(makeCanvas(4, 1, g => {
+  [70, 140, 200, 255].forEach((v, i) => { g.fillStyle = `rgb(${v},${v},${v})`; g.fillRect(i, 0, 1, 1); });
+}));
+gradientMap.minFilter = gradientMap.magFilter = THREE.NearestFilter;
+gradientMap.generateMipmaps = false;
+const toon = (color, opts = {}) => new THREE.MeshToonMaterial(Object.assign({ color, gradientMap }, opts));
+const basic = (color, opts = {}) => new THREE.MeshBasicMaterial(Object.assign({ color }, opts));
+const additive = { transparent: true, blending: THREE.AdditiveBlending, depthWrite: false };
+
+// =====================================================================
+//  MATERIALIEN
+// =====================================================================
+const MAT = {
+  paint: toon(0xd42418),
+  dark: toon(0x26252c),
+  metal: toon(0x9aa3ad),
+  glass: toon(0x22344f, { emissive: 0x08101c }),
+  rubber: toon(0x1a1a1e),
+  rim: toon(0xffffff, { map: TEX.rim }),
+  headlight: basic(0xfff6d0),
+  tail: basic(0xff2a1a),
+  roofLamp: basic(0xfff2a0),
+  flameOuter: basic(0x2a7bff, Object.assign({ opacity: 0.85 }, additive)),
+  flameInner: basic(0xbff4ff, Object.assign({ opacity: 0.9 }, additive)),
+  skin: ['#7fae5a', '#93c06a', '#6e9a58', '#a2b86a'].map(c => toon(c)),
+  shirt: ['#5a6e8a', '#8a5a4a', '#6a7a4a', '#7a6a8a', '#a08a5a', '#8a8a8a'].map(c => toon(0xffffff, { map: shirtTex(c) })),
+  pants: ['#3a3a4a', '#4a3a2a', '#2e3a4e', '#4a4a3a'].map(c => toon(c)),
+  shoe: toon(0x2a2018),
+  hair: toon(0x2a2a1a),
+  eye: basic(0xff2a10),
+  mouth: toon(0x2a0a0a),
+  wood: toon(0xffffff, { map: TEX.wood }),
+  woodDark: toon(0x5a3a22),
+  crate: toon(0xffffff, { map: TEX.crate }),
+  rust: [toon(0xffffff, { map: TEX.rust }), toon(0x9aaab0, { map: TEX.rust }), toon(0x8a9a6a, { map: TEX.rust }), toon(0xb08070, { map: TEX.rust })],
+  concrete: toon(0xffffff, { map: TEX.concrete }),
+  stripes: toon(0xffffff, { map: TEX.stripes }),
+  ramp: toon(0xc08a10),
+  rampTop: toon(0xffffff, { map: TEX.ramp }),
+  coin: toon(0xffcc22, { emissive: 0x6a4400 }),
+  kit: toon(0xffffff, { map: TEX.kit, emissive: 0x330000 }),
+  pole: toon(0x2c2c34),
+  bark: toon(0x3a2a20),
+  curb: toon(0x6a6670),
+  ground: toon(0x17141a),
+  fire: new THREE.SpriteMaterial(Object.assign({ map: TEX.fire, color: 0xffa040 }, additive)),
+  goo: [0x7dff3a, 0x4ae020, 0xb4ff6a].map(c => basic(c)),
+  gold: [basic(0xffe066), basic(0xffb020)],
+  repair: [basic(0xff5a4a), basic(0xffffff)],
+  // Laternen: eine ruhige und zwei flackernde Varianten
+  bulb: [0, 1, 2].map(() => basic(0xffd890)),
+  cone: [0, 1, 2].map(() => basic(0xffc870, Object.assign({ opacity: 0.07, side: THREE.DoubleSide }, additive)))
+};
+
+// Wiederverwendbare Bauteile
+const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
+function box(w, h, d, mat, x, y, z, parent) {
+  const m = new THREE.Mesh(UNIT_BOX, mat);
+  m.scale.set(w, h, d);
+  m.position.set(x || 0, y || 0, z || 0);
+  m.castShadow = true;
+  if (parent) parent.add(m);
+  return m;
+}
+const geoCache = {};
+function cyl(rt, rb, h, mat, seg = 12) {
+  const key = [rt, rb, h, seg].join('|');
+  const geo = geoCache[key] || (geoCache[key] = new THREE.CylinderGeometry(rt, rb, h, seg));
+  const m = new THREE.Mesh(geo, mat);
+  m.castShadow = true;
+  return m;
+}
+const WHEEL_GEO = new THREE.CylinderGeometry(0.45, 0.45, 0.36, 18).rotateZ(Math.PI / 2);
+const WHEEL_MATS = [MAT.rubber, MAT.rim, MAT.rim];
+
+// =====================================================================
+//  HIMMEL: Sterne, Mond, glühender Horizont, Skyline
+// =====================================================================
+const skyGroup = new THREE.Group();
+scene.add(skyGroup);
+{
+  const skyTex = new THREE.CanvasTexture(makeCanvas(1024, 512, (g, w, h) => {
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, '#03030a');
+    gr.addColorStop(0.3, '#0a0920');
+    gr.addColorStop(0.44, '#2a1232');
+    gr.addColorStop(0.49, '#8a2a1c');
+    gr.addColorStop(0.5, '#c2441c');
+    gr.addColorStop(0.53, '#4a1616');
+    gr.addColorStop(1, '#08050a');
+    g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 800; i++) {
+      const y = h * 0.43 * Math.pow(Math.random(), 1.4);
+      const a = rand(0.3, 1) * (1 - y / (h * 0.46));
+      const s = rand(0.6, 1.9);
+      g.fillStyle = `rgba(255,255,240,${a.toFixed(2)})`;
+      g.fillRect(rand(0, w), y, s, s);
+    }
+  }));
+  const sky = new THREE.Mesh(new THREE.SphereGeometry(450, 32, 16),
+    new THREE.MeshBasicMaterial({ map: skyTex, side: THREE.BackSide, fog: false, depthWrite: false }));
+  skyGroup.add(sky);
+
+  const moonTex = new THREE.CanvasTexture(makeCanvas(256, 256, (g) => {
+    const halo = g.createRadialGradient(128, 128, 30, 128, 128, 128);
+    halo.addColorStop(0, 'rgba(255,240,200,.45)');
+    halo.addColorStop(1, 'rgba(255,240,200,0)');
+    g.fillStyle = halo; g.fillRect(0, 0, 256, 256);
+    g.fillStyle = '#f3ecd0'; g.beginPath(); g.arc(128, 128, 46, 0, Math.PI * 2); g.fill();
+    g.fillStyle = 'rgba(180,170,140,.6)';
+    [[110, 115, 10], [145, 135, 7], [125, 150, 6], [140, 105, 5], [104, 142, 4]].forEach(([x, y, r]) => {
+      g.beginPath(); g.arc(x, y, r, 0, Math.PI * 2); g.fill();
+    });
+  }));
+  const moon = new THREE.Sprite(new THREE.SpriteMaterial({ map: moonTex, fog: false, transparent: true, depthWrite: false }));
+  moon.scale.set(90, 90, 1);
+  moon.position.set(-130, 150, -330);
+  skyGroup.add(moon);
+
+  // Skyline der brennenden Stadt
+  const skylineTex = new THREE.CanvasTexture(makeCanvas(2048, 256, (g, w, h) => {
+    const glow = g.createLinearGradient(0, h, 0, h * 0.3);
+    glow.addColorStop(0, 'rgba(255,90,30,.65)');
+    glow.addColorStop(1, 'rgba(255,60,20,0)');
+    g.fillStyle = glow; g.fillRect(0, 0, w, h);
+    for (let i = 0; i < 9; i++) {              // Brände
+      const x = rand(0, w), r = rand(40, 110);
+      const f = g.createRadialGradient(x, h, 0, x, h, r);
+      f.addColorStop(0, 'rgba(255,170,60,.9)'); f.addColorStop(1, 'rgba(255,60,0,0)');
+      g.fillStyle = f; g.fillRect(x - r, h - r, r * 2, r);
+    }
+    let x = 0;
+    while (x < w) {
+      const bw = rand(18, 70), bh = rand(40, 200);
+      g.fillStyle = '#0a0610'; g.fillRect(x, h - bh, bw, bh);
+      if (Math.random() < 0.2) g.fillRect(x + bw / 2 - 1, h - bh - rand(10, 30), 2, 30);
+      for (let k = 0; k < bh / 12; k++) {
+        if (Math.random() < 0.35) {
+          g.fillStyle = pick(['rgba(255,190,90,.8)', 'rgba(255,140,60,.7)']);
+          g.fillRect(x + rand(3, bw - 5), h - rand(6, bh - 4), 2, 3);
+        }
+      }
+      x += bw + rand(0, 6);
+    }
+  }));
+  skylineTex.wrapS = THREE.RepeatWrapping;
+  skylineTex.repeat.x = 3;
+  const skyline = new THREE.Mesh(new THREE.CylinderGeometry(400, 400, 70, 48, 1, true),
+    new THREE.MeshBasicMaterial({ map: skylineTex, side: THREE.BackSide, transparent: true, fog: false, depthWrite: false }));
+  skyline.position.y = 27;
+  skyGroup.add(skyline);
+}
+
+// =====================================================================
+//  STRASSE, GEHWEGE, BODEN
+// =====================================================================
+const ROAD_LEN = 240;
+const scrollTextures = [];
+{
+  TEX.road.repeat.set(1, ROAD_LEN / ROAD_TILE);
+  const road = new THREE.Mesh(new THREE.PlaneGeometry(ROAD_W, ROAD_LEN), toon(0xffffff, { map: TEX.road }));
+  road.rotation.x = -Math.PI / 2;
+  road.position.set(0, 0, 20 - ROAD_LEN / 2);
+  road.receiveShadow = true;
+  scene.add(road);
+  scrollTextures.push({ tex: TEX.road, tile: ROAD_TILE });
+
+  const WALK_W = 3.2;
+  TEX.walk.repeat.set(1, ROAD_LEN / WALK_W);
+  const walkMat = toon(0xffffff, { map: TEX.walk });
+  [-1, 1].forEach(side => {
+    const walk = new THREE.Mesh(new THREE.PlaneGeometry(WALK_W, ROAD_LEN), walkMat);
+    walk.rotation.x = -Math.PI / 2;
+    walk.position.set(side * (ROAD_W / 2 + WALK_W / 2), 0.18, 20 - ROAD_LEN / 2);
+    walk.receiveShadow = true;
+    scene.add(walk);
+    const curb = new THREE.Mesh(UNIT_BOX, MAT.curb);   // Bordstein
+    curb.scale.set(0.2, 0.2, ROAD_LEN);
+    curb.position.set(side * (ROAD_W / 2 + 0.05), 0.09, 20 - ROAD_LEN / 2);
+    curb.receiveShadow = true;
+    scene.add(curb);
+  });
+  scrollTextures.push({ tex: TEX.walk, tile: WALK_W });
+
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(200, ROAD_LEN + 60), MAT.ground);
+  ground.rotation.x = -Math.PI / 2;
+  ground.position.set(0, -0.05, 20 - ROAD_LEN / 2);
+  scene.add(ground);
+}
+
+// =====================================================================
+//  HOCHHÄUSER (werden immer wieder nach vorne versetzt)
+// =====================================================================
+const buildings = [];
+const farZ = { '-1': 20, '1': 20 };
+function placeBuilding(b) {
+  const len = rand(9, 17), depth = rand(7, 11), h = rand(10, 36);
+  b.len = len;
+  b.z = farZ[b.side] - rand(0.5, 4) - len / 2;
+  farZ[b.side] = b.z - len / 2;
+  b.mesh.scale.set(depth, h, len);
+  b.mesh.position.set(b.side * (ROAD_W / 2 + 3.4 + 0.6 + depth / 2), h / 2, b.z);
+  b.mesh.material.map.repeat.set(len / 8, h / 16);
+  b.mesh.material.emissiveMap.repeat.set(len / 8, h / 16);
+  b.mesh.material.color.setHSL(rand(0, 1), 0.1, rand(0.55, 0.85));
+}
+[-1, 1].forEach(side => {
+  while (farZ[side] > -230) {
+    const f = pick(FACADES);
+    const map = f.map.clone(), emissiveMap = f.emissiveMap.clone();
+    map.needsUpdate = emissiveMap.needsUpdate = true;
+    const mesh = new THREE.Mesh(UNIT_BOX, toon(0xffffff, { map, emissiveMap, emissive: 0xffffff }));
+    scene.add(mesh);
+    const b = { mesh, side, z: 0, len: 0 };
+    placeBuilding(b);
+    buildings.push(b);
+  }
+});
+
+// =====================================================================
+//  DEKO AM STRASSENRAND: Laternen, Bäume, brennende Fässer, Wracks
+// =====================================================================
+function makeLamp(side) {
+  const g = new THREE.Group();
+  const pole = cyl(0.08, 0.11, 5.6, MAT.pole, 8); pole.position.y = 2.8; g.add(pole);
+  box(1.7, 0.08, 0.08, MAT.pole, -side * 0.8, 5.55, 0, g);
+  box(0.55, 0.16, 0.32, MAT.pole, -side * 1.55, 5.5, 0, g);
+  const v = Math.random() < 0.6 ? 0 : randInt(1, 2);   // manche flackern
+  box(0.4, 0.05, 0.22, MAT.bulb[v], -side * 1.55, 5.41, 0, g).castShadow = false;
+  const cone = new THREE.Mesh(new THREE.ConeGeometry(1.7, 5.3, 16, 1, true), MAT.cone[v]);
+  cone.position.set(-side * 1.55, 2.72, 0);
+  g.add(cone);
+  return g;
+}
+function makeTree() {
+  const g = new THREE.Group();
+  const trunk = cyl(0.12, 0.22, 3.2, MAT.bark, 7); trunk.position.y = 1.6; g.add(trunk);
+  for (let i = 0; i < 5; i++) {
+    const len = rand(1.2, 2.2);
+    const pivot = new THREE.Group(); pivot.position.y = rand(2.0, 3.1); pivot.rotation.y = rand(0, Math.PI * 2);
+    const tilt = new THREE.Group(); tilt.rotation.z = rand(0.5, 1.1); pivot.add(tilt);
+    const branch = cyl(0.03, 0.08, len, MAT.bark, 5); branch.position.y = len / 2; tilt.add(branch);
+    const twigPivot = new THREE.Group(); twigPivot.position.y = len * 0.75; twigPivot.rotation.z = rand(-1, -0.5); tilt.add(twigPivot);
+    const tl = len * 0.5;
+    const twig = cyl(0.015, 0.035, tl, MAT.bark, 4); twig.position.y = tl / 2; twigPivot.add(twig);
+    g.add(pivot);
+  }
+  return g;
+}
+const fireLights = [];
+function makeBarrel() {
+  const g = new THREE.Group();
+  const b = cyl(0.38, 0.38, 1.0, MAT.rust[0], 12); b.position.y = 0.5; g.add(b);
+  [0.2, 0.8].forEach(y => { const band = cyl(0.4, 0.4, 0.06, MAT.dark, 12); band.position.y = y; g.add(band); });
+  const fires = [];
+  for (let i = 0; i < 3; i++) {
+    const s = new THREE.Sprite(MAT.fire);
+    s.position.set(rand(-0.12, 0.12), 1.25, rand(-0.12, 0.12));
+    g.add(s); fires.push(s);
+  }
+  g.userData.fires = fires;
+  if (!LOW_Q && fireLights.length < 3) {        // nur ein paar echte Lichter, das spart Leistung
+    const l = new THREE.PointLight(0xff7a2a, 1.6, 10, 1.5);
+    l.position.y = 1.8; g.add(l); fireLights.push(l);
+  }
+  return g;
+}
+
+const SCENERY_SPAN = 230;
+const scenery = [];
+function addScenery(obj, x, z) {
+  obj.position.set(x, 0.18, z);
+  scene.add(obj);
+  scenery.push({ obj, x, z });
+}
+{
+  const lampGap = SCENERY_SPAN / 9;
+  for (let i = 0; i < 9; i++) {
+    addScenery(makeLamp(-1), -(ROAD_W / 2 + 0.45), 15 - i * lampGap);
+    addScenery(makeLamp(1), ROAD_W / 2 + 0.45, 15 - i * lampGap - lampGap / 2);
+  }
+  for (let i = 0; i < (LOW_Q ? 8 : 12); i++) {
+    const side = i % 2 ? 1 : -1;
+    addScenery(makeTree(), side * rand(6.6, 7.2), 15 - rand(0, SCENERY_SPAN));
+  }
+  for (let i = 0; i < 5; i++) {
+    const side = i % 2 ? 1 : -1;
+    addScenery(makeBarrel(), side * rand(5.6, 7.0), 15 - i * (SCENERY_SPAN / 5) - rand(0, 20));
+  }
+}
+
+// =====================================================================
+//  DAS AUTO
+// =====================================================================
+const RED = new THREE.Color(0xd42418), BURNT = new THREE.Color(0x2a1210);
+const carModel = (() => {
+  const root = new THREE.Group();
+  const body = new THREE.Group(); root.add(body);
+  const M = MAT;
+  box(1.9, 0.62, 3.8, M.paint, 0, 0.75, 0, body);          // Karosserie
+  box(1.94, 0.2, 3.86, M.dark, 0, 0.46, 0, body);          // Unterboden
+  box(1.6, 0.12, 1.4, M.paint, 0, 1.1, -1.15, body);       // Motorhaube
+  box(0.5, 0.1, 0.5, M.dark, 0, 1.2, -1.2, body);          // Lufthutze
+  const cab = new THREE.Mesh(UNIT_BOX, [M.glass, M.glass, M.paint, M.paint, M.glass, M.glass]);
+  cab.scale.set(1.66, 0.6, 1.9); cab.position.set(0, 1.36, 0.35); cab.castShadow = true;
+  body.add(cab);
+  box(1.74, 0.09, 2.0, M.paint, 0, 1.69, 0.35, body);      // Dach
+  [-1, 1].forEach(s => {
+    box(0.06, 0.24, 2.7, M.dark, s * 0.97, 0.8, 0.1, body);  // Panzerplatten
+    box(0.05, 0.06, 1.7, M.metal, s * 0.84, 1.3, 0.35, body); // Gitter vor den Fenstern
+  });
+  // Rammbügel mit Stacheln
+  [0.58, 0.98].forEach(y => { const bar = cyl(0.07, 0.07, 2.1, M.metal, 8); bar.rotation.z = Math.PI / 2; bar.position.set(0, y, -2.05); body.add(bar); });
+  [-0.8, 0.8].forEach(x => { const post = cyl(0.07, 0.07, 0.7, M.metal, 8); post.position.set(x, 0.75, -2.05); body.add(post); });
+  const spikeGeo = new THREE.ConeGeometry(0.08, 0.38, 8).rotateX(-Math.PI / 2);
+  for (let i = 0; i < 5; i++) {
+    const sp = new THREE.Mesh(spikeGeo, M.metal);
+    sp.position.set(-0.8 + i * 0.4, 0.78, -2.27); sp.castShadow = true;
+    body.add(sp);
+  }
+  // Dachscheinwerfer
+  box(1.3, 0.14, 0.22, M.dark, 0, 1.81, -0.35, body);
+  [-0.45, -0.15, 0.15, 0.45].forEach(x => box(0.22, 0.11, 0.06, M.roofLamp, x, 1.81, -0.47, body));
+  // Scheinwerfer und Rücklichter
+  [-0.62, 0.62].forEach(x => {
+    box(0.38, 0.16, 0.05, M.headlight, x, 0.86, -1.91, body);
+    box(0.34, 0.12, 0.05, M.tail, x, 0.9, 1.91, body);
+  });
+  // Ersatzrad hinten
+  const spare = new THREE.Mesh(WHEEL_GEO, WHEEL_MATS);
+  spare.rotation.y = Math.PI / 2; spare.scale.setScalar(0.85);
+  spare.position.set(0, 1.08, 2.06); spare.castShadow = true;
+  body.add(spare);
+  // Räder (drehen sich)
+  const wheels = [];
+  [[-0.98, -1.25], [0.98, -1.25], [-0.98, 1.25], [0.98, 1.25]].forEach(([x, z]) => {
+    const w = new THREE.Mesh(WHEEL_GEO, WHEEL_MATS);
+    w.position.set(x, 0.45, z); w.castShadow = true;
+    root.add(w); wheels.push(w);
+  });
+  // Echte Scheinwerfer
+  [-0.6, 0.6].forEach(x => {
+    const sp = new THREE.SpotLight(0xfff2cc, 2.4, 50, 0.5, 0.45, 1);
+    sp.position.set(x, 0.9, -1.9);
+    sp.target.position.set(x * 1.6, 0, -20);
+    root.add(sp, sp.target);
+  });
+  // Blaue Nitro-Flammen
+  const flames = new THREE.Group();
+  const outerGeo = new THREE.ConeGeometry(0.24, 1.3, 10).rotateX(Math.PI / 2);
+  const innerGeo = new THREE.ConeGeometry(0.12, 0.8, 8).rotateX(Math.PI / 2);
+  [-0.5, 0.5].forEach(x => {
+    const o = new THREE.Mesh(outerGeo, M.flameOuter); o.position.set(x, 0.5, 2.6);
+    const i = new THREE.Mesh(innerGeo, M.flameInner); i.position.set(x, 0.5, 2.35);
+    flames.add(o, i);
+  });
+  flames.visible = false;
+  root.add(flames);
+  scene.add(root);
+  return { root, body, wheels, flames };
+})();
+
+// =====================================================================
+//  ZOMBIES, HINDERNISSE, MÜNZEN, RAMPEN, WERKZEUGKISTEN
+// =====================================================================
+function makeZombie() {
+  const g = new THREE.Group();
+  const skin = pick(MAT.skin), shirt = pick(MAT.shirt), pants = pick(MAT.pants);
+  const legs = [-0.16, 0.16].map(x => {
+    const leg = new THREE.Group(); leg.position.set(x, 0.85, 0); g.add(leg);
+    box(0.2, 0.85, 0.22, pants, 0, -0.42, 0, leg);
+    box(0.22, 0.1, 0.32, MAT.shoe, 0, -0.82, 0.05, leg);
+    return leg;
+  });
+  const torso = new THREE.Group(); torso.position.y = 0.85; torso.rotation.x = 0.5; g.add(torso);  // gebückt
+  box(0.62, 0.72, 0.36, shirt, 0, 0.36, 0, torso);
+  const head = new THREE.Group(); head.position.set(0, 0.78, 0.06); head.rotation.x = -0.35; torso.add(head);
+  box(0.42, 0.42, 0.42, skin, 0, 0.2, 0, head);
+  [-0.1, 0.1].forEach(x => box(0.1, 0.07, 0.04, MAT.eye, x, 0.25, 0.215, head).castShadow = false);
+  box(0.22, 0.05, 0.03, MAT.mouth, 0, 0.08, 0.215, head);
+  for (let i = 0; i < 3; i++) box(0.1, 0.08, 0.1, MAT.hair, rand(-0.15, 0.15), 0.44, rand(-0.15, 0.1), head);
+  const arms = [-0.38, 0.38].map(x => {
+    const arm = new THREE.Group(); arm.position.set(x, 0.62, 0); arm.rotation.x = -0.4; torso.add(arm);
+    box(0.15, 0.15, 0.62, shirt, 0, 0, 0.28, arm);
+    box(0.14, 0.14, 0.2, skin, 0, 0, 0.66, arm);
+    return arm;
+  });
+  g.userData = { legs, arms, head };
+  return g;
+}
+
+function makeFence() {
+  const g = new THREE.Group();
+  [-1.08, 1.08].forEach(x => box(0.14, 1.3, 0.14, MAT.woodDark, x, 0.65, 0, g));
+  [0.35, 0.95].forEach(y => box(2.3, 0.12, 0.08, MAT.woodDark, 0, y, 0.08, g));
+  for (let i = 0; i < 9; i++) {
+    const h = rand(0.95, 1.3);
+    const slat = box(0.19, h, 0.05, MAT.wood, -1.0 + i * 0.25, h / 2, 0, g);
+    slat.rotation.z = rand(-0.08, 0.08);
+  }
+  return g;
+}
+const CRATE_GEO = new THREE.BoxGeometry(0.95, 0.95, 0.95);
+function makeCrates() {
+  const g = new THREE.Group();
+  [[-0.5, 0.475], [0.5, 0.475], [rand(-0.3, 0.3), 1.42]].forEach(([x, y]) => {
+    const c = new THREE.Mesh(CRATE_GEO, MAT.crate);
+    c.position.set(x, y, rand(-0.1, 0.1)); c.rotation.y = rand(-0.2, 0.2); c.castShadow = true;
+    g.add(c);
+  });
+  return g;
+}
+function makeWreck() {
+  const g = new THREE.Group();
+  const mat = pick(MAT.rust);
+  box(1.8, 0.6, 3.4, mat, 0, 0.6, 0, g);
+  box(1.55, 0.5, 1.7, mat, 0, 1.15, 0.25, g);
+  box(1.58, 0.32, 1.5, MAT.dark, 0, 1.17, 0.25, g);   // kaputte Fenster
+  box(1.7, 0.12, 0.9, mat, 0.1, 0.98, -1.2, g).rotation.z = 0.15;  // verbeulte Haube
+  [[-0.9, -1.1], [0.9, -1.1], [-0.9, 1.1], [0.9, 1.1]].forEach(([x, z]) => {
+    const w = new THREE.Mesh(WHEEL_GEO, [MAT.rubber, MAT.dark, MAT.dark]);
+    w.position.set(x, 0.32, z); w.scale.set(1, 0.7, 0.7); g.add(w);
+  });
+  return g;
+}
+const STRIPE_GEO = new THREE.BoxGeometry(2.4, 0.55, 0.42);
+function makeBarrier() {
+  const g = new THREE.Group();
+  box(2.4, 0.36, 0.85, MAT.concrete, 0, 0.18, 0, g);
+  const top = new THREE.Mesh(STRIPE_GEO, MAT.stripes);
+  top.position.y = 0.63; top.castShadow = true; g.add(top);
+  return g;
+}
+const RAMP_GEO = (() => {
+  const shape = new THREE.Shape();
+  shape.moveTo(0, 0); shape.lineTo(RAMP_LEN, 0); shape.lineTo(RAMP_LEN, RAMP_H); shape.closePath();
+  return new THREE.ExtrudeGeometry(shape, { depth: 2.2, bevelEnabled: false }).translate(0, 0, -1.1);
+})();
+const RAMP_TOP_GEO = new THREE.PlaneGeometry(2.2, Math.hypot(RAMP_LEN, RAMP_H));
+TEX.ramp.repeat.set(1, 2);
+function makeRamp() {
+  const g = new THREE.Group();
+  const wedge = new THREE.Mesh(RAMP_GEO, MAT.ramp);
+  wedge.rotation.y = Math.PI / 2;               // Rampe steigt nach vorne (-z) an
+  wedge.castShadow = true; g.add(wedge);
+  const top = new THREE.Mesh(RAMP_TOP_GEO, MAT.rampTop);
+  top.rotation.x = -Math.PI / 2 + Math.atan2(RAMP_H, RAMP_LEN);
+  top.position.set(0, RAMP_H / 2 + 0.01, -RAMP_LEN / 2);
+  g.add(top);
+  return g;
+}
+const COIN_GEO = new THREE.CylinderGeometry(0.4, 0.4, 0.09, 20).rotateX(Math.PI / 2);
+function makeCoin() {
+  const m = new THREE.Mesh(COIN_GEO, MAT.coin);
+  m.castShadow = true;
+  return m;
+}
+const KIT_GEO = new THREE.BoxGeometry(0.9, 0.55, 0.55);
+function makeKit() {
+  const g = new THREE.Group();
+  const b = new THREE.Mesh(KIT_GEO, MAT.kit); b.castShadow = true; g.add(b);
+  box(0.4, 0.08, 0.08, MAT.dark, 0, 0.36, 0, g);
+  [-0.18, 0.18].forEach(x => box(0.06, 0.12, 0.06, MAT.dark, x, 0.3, 0, g));
+  return g;
+}
+
+const FACTORY = { zombie: makeZombie, fence: makeFence, crates: makeCrates, wreck: makeWreck, barrier: makeBarrier, ramp: makeRamp, coin: makeCoin, kit: makeKit };
+const KIND = { fence: 'obstacle', crates: 'obstacle', wreck: 'obstacle', barrier: 'obstacle', ramp: 'ramp', coin: 'coin', kit: 'kit' };
+const SIZE = { fence: [1.15, 0.2], crates: [1.0, 0.5], wreck: [1.0, 1.8], barrier: [1.2, 0.45] };   // halbe Breite, halbe Tiefe
+const DEBRIS_MAT = { fence: [MAT.wood, MAT.woodDark], crates: [MAT.crate], wreck: MAT.rust.concat([MAT.dark]), barrier: [MAT.concrete, MAT.stripes] };
+
+// Objekte werden wiederverwendet statt immer neu gebaut (Pool)
+const pools = {};
+function obtain(type) {
+  const p = pools[type] || (pools[type] = []);
+  const mesh = p.pop() || FACTORY[type]();
+  mesh.rotation.set(0, 0, 0);
+  scene.add(mesh);
+  return mesh;
+}
+function release(type, mesh) {
+  scene.remove(mesh);
+  pools[type].push(mesh);
+}
+
+const active = [];    // Hindernisse, Münzen, Rampen, Werkzeugkisten
+const zombies = [];
+function spawnThing(type, x, z, y = 0) {
+  const mesh = obtain(type);
+  mesh.position.set(x, y, z);
+  if (type === 'wreck') mesh.rotation.y = rand(-0.25, 0.25);
+  const s = SIZE[type] || [0, 0];
+  const o = { type, kind: KIND[type], mesh, x, y, z, hw: s[0], hd: s[1], dead: false, on: false, used: false, phase: rand(0, 6) };
+  active.push(o);
+  return o;
+}
+function spawnZombie(x, z, roadside) {
+  const mesh = obtain('zombie');
+  mesh.scale.setScalar(rand(0.85, 1.25));     // verschiedene Größen
+  const zb = { mesh, x, z, roadside, walk: rand(2, 3.4), steer: roadside ? rand(2.4, 3.2) : rand(1.4, 2.2), phase: rand(0, 6), flying: false, vx: 0, vy: 0, vz: 0, spinX: 0, spinZ: 0 };
+  mesh.position.set(x, 0, z);
+  zombies.push(zb);
+}
+
+// =====================================================================
+//  TEILCHEN: Splitter, grüne Zombie-Teilchen, Rauch, Asche
+// =====================================================================
+const bits = [];
+const BIT_COUNT = LOW_Q ? 90 : 160;
+for (let i = 0; i < BIT_COUNT; i++) {
+  const m = new THREE.Mesh(UNIT_BOX, MAT.goo[0]);
+  m.visible = false; scene.add(m);
+  bits.push({ m, life: 0, max: 1, vx: 0, vy: 0, vz: 0, s: 0.2 });
+}
+let bitIndex = 0;
+function spawnBits(x, y, z, count, mats, sMin, sMax, power) {
+  for (let i = 0; i < count; i++) {
+    const b = bits[bitIndex = (bitIndex + 1) % bits.length];
+    b.m.material = pick(mats);
+    b.s = rand(sMin, sMax);
+    b.m.scale.set(b.s, b.s * rand(0.5, 1), b.s);
+    b.m.position.set(x + rand(-0.6, 0.6), y + rand(0, 0.8), z + rand(-0.3, 0.3));
+    b.m.rotation.set(rand(0, 6), rand(0, 6), rand(0, 6));
+    b.vx = rand(-5, 5) * power;
+    b.vy = rand(3, 9) * power;
+    b.vz = -state.speed * rand(0.5, 1.05) - rand(0, 4);   // fliegen nach vorne weg
+    b.life = b.max = rand(1.0, 1.8);
+    b.m.visible = true;
+  }
+}
+function updateBits(dt, d) {
+  for (const b of bits) {
+    if (!b.m.visible) continue;
+    b.life -= dt;
+    if (b.life <= 0 || b.m.position.z > DESPAWN_Z) { b.m.visible = false; continue; }
+    b.vy -= 20 * dt;
+    const p = b.m.position;
+    p.x += b.vx * dt; p.y += b.vy * dt; p.z += d + b.vz * dt;
+    if (p.y < b.s / 2 && b.vy < 0) { p.y = b.s / 2; b.vy *= -0.35; b.vx *= 0.6; b.vz *= 0.4; }
+    b.m.rotation.x += dt * 6; b.m.rotation.y += dt * 4;
+    const k = Math.min(1, b.life / 0.4);
+    b.m.scale.setScalar(b.s * k);
+  }
+}
+
+const smoke = [];
+for (let i = 0; i < 50; i++) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: TEX.soft, color: 0x555555, transparent: true, depthWrite: false, opacity: 0 }));
+  s.visible = false; scene.add(s);
+  smoke.push({ s, life: 0, max: 1, vx: 0, vy: 0 });
+}
+let smokeIndex = 0, smokeAcc = 0;
+function emitSmoke(dark) {
+  const p = smoke[smokeIndex = (smokeIndex + 1) % smoke.length];
+  p.s.position.set(car.x + rand(-0.4, 0.4), car.y + 1.25, -1.1 + rand(-0.3, 0.3));
+  p.s.material.color.setHex(dark ? 0x222222 : 0x6a6a6a);
+  p.life = p.max = rand(0.9, 1.6);
+  p.vx = rand(-0.6, 0.6); p.vy = rand(1.5, 2.8);
+  p.s.visible = true;
+}
+function updateSmoke(dt, d) {
+  for (const p of smoke) {
+    if (!p.s.visible) continue;
+    p.life -= dt;
+    if (p.life <= 0) { p.s.visible = false; continue; }
+    const t = 1 - p.life / p.max;
+    p.s.position.x += p.vx * dt; p.s.position.y += p.vy * dt; p.s.position.z += d * 0.85;
+    p.s.scale.setScalar(0.6 + t * 2.4);
+    p.s.material.opacity = 0.75 * (1 - t);
+  }
+}
+
+// Fliegende Asche und Glut
+const ASH_COUNT = LOW_Q ? 160 : 420;
+const ashGeo = new THREE.BufferGeometry();
+const ashPos = new Float32Array(ASH_COUNT * 3), ashCol = new Float32Array(ASH_COUNT * 3);
+for (let i = 0; i < ASH_COUNT; i++) {
+  ashPos[i * 3] = rand(-16, 16); ashPos[i * 3 + 1] = rand(0, 14); ashPos[i * 3 + 2] = rand(-70, 10);
+  const ember = Math.random() < 0.25;
+  const c = ember ? [1, rand(0.4, 0.6), 0.15] : [0.55, 0.52, 0.5];
+  ashCol.set(c, i * 3);
+}
+ashGeo.setAttribute('position', new THREE.BufferAttribute(ashPos, 3));
+ashGeo.setAttribute('color', new THREE.BufferAttribute(ashCol, 3));
+const ash = new THREE.Points(ashGeo, new THREE.PointsMaterial(Object.assign({ size: 0.16, map: TEX.soft, vertexColors: true }, additive)));
+scene.add(ash);
+function updateAsh(dt, d) {
+  for (let i = 0; i < ASH_COUNT; i++) {
+    const k = i * 3;
+    ashPos[k] += Math.sin(clockTime * 0.7 + i) * dt * 0.6;
+    ashPos[k + 1] -= dt * (0.4 + (i % 5) * 0.12);
+    ashPos[k + 2] += d * 0.9 + dt * 0.5;
+    if (ashPos[k + 1] < 0 || ashPos[k + 2] > 10) {
+      ashPos[k] = rand(-16, 16); ashPos[k + 1] = rand(4, 14); ashPos[k + 2] = rand(-70, -40);
+    }
+  }
+  ashGeo.attributes.position.needsUpdate = true;
+}
+
+// =====================================================================
+//  SPIELZUSTAND
+// =====================================================================
+const state = {
+  mode: 'menu',          // 'menu' | 'playing' | 'over'
+  time: 0, diff: 0, speed: 12, slow: 1, dist: 0,
+  coins: 0, zombies: 0, hp: MAX_HP, nitro: 0, nitroTime: 0,
+  shake: 0, flash: 0, zombieTimer: 1.5, nextPattern: 30
+};
+const car = { x: 0, lane: 1, y: 0, vy: 0, air: false, dark: 0, onRamp: false };
+let clockTime = 0;
+let lastResult = null;
+
+const $ = id => document.getElementById(id);
+const ui = {
+  hud: $('hud'), flash: $('flash'), toast: $('toast'), nitroBtn: $('nitroBtn'),
+  hpText: $('hpText'), hpFill: $('hpFill'), nitroFill: $('nitroFill'), nitroBar: $('nitroBar'),
+  score: $('score'), coins: $('coinText'), zombies: $('zombieText'),
+  menu: $('menu'), board: $('boardScreen'), boardBody: $('boardBody'), over: $('overScreen'),
+  finalScore: $('finalScore'), statDist: $('statDist'), statCoins: $('statCoins'), statZombies: $('statZombies'),
+  nameBox: $('nameBox'), nameInput: $('nameInput'), saveBtn: $('saveBtn'), overInfo: $('overInfo')
+};
+
+const currentScore = () => Math.floor(state.dist) + state.coins * COIN_POINTS + state.zombies * ZOMBIE_POINTS;
+
+let toastTimer = 0;
+function toast(text, color = '#fff') {
+  ui.toast.textContent = text;
+  ui.toast.style.color = color;
+  ui.toast.style.opacity = 1;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { ui.toast.style.opacity = 0; }, 1100);
+}
+
+function resetGame() {
+  for (const o of active) release(o.type, o.mesh);
+  active.length = 0;
+  for (const z of zombies) release('zombie', z.mesh);
+  zombies.length = 0;
+  bits.forEach(b => { b.m.visible = false; });
+  smoke.forEach(p => { p.s.visible = false; });
+  Object.assign(state, {
+    time: 0, diff: 0, slow: 1, dist: 0, coins: 0, zombies: 0, hp: MAX_HP,
+    nitro: 0, nitroTime: 0, shake: 0, flash: 0, zombieTimer: 1.5, nextPattern: 30
+  });
+  Object.assign(car, { x: 0, lane: 1, y: 0, vy: 0, air: false, dark: 0, onRamp: false });
+}
+
+function startGame() {
+  if (document.activeElement) document.activeElement.blur();
+  resetGame();
+  state.mode = 'playing';
+  [ui.menu, ui.board, ui.over].forEach(el => el.classList.add('hidden'));
+  ui.hud.classList.remove('hidden');
+  ui.nitroBtn.classList.toggle('hidden', !isTouch);
+}
+
+function damage(amount) {
+  if (state.mode !== 'playing') return;
+  if (state.nitroTime > 0) amount *= NITRO_DAMAGE;
+  state.hp = Math.max(0, state.hp - amount);
+  state.shake = Math.min(0.6, 0.15 + amount / 100);
+  state.flash = 0.85;
+  state.slow = 0.55;       // nach einem Treffer kurz langsamer
+  if (state.hp <= 0) gameOver();
+}
+
+function addNitro(v) {
+  if (state.nitroTime > 0) return;
+  const before = state.nitro;
+  state.nitro = Math.min(100, state.nitro + v);
+  if (before < 100 && state.nitro >= 100) toast(isTouch ? 'Nitro bereit!' : 'Nitro bereit! (E)', '#7fe6ff');
+}
+
+function activateNitro() {
+  if (state.mode !== 'playing' || state.nitro < 100 || state.nitroTime > 0) return;
+  state.nitroTime = NITRO_TIME;
+  toast('NITRO!', '#7fe6ff');
+}
+
+function changeLane(dir) {
+  if (state.mode !== 'playing') return;
+  car.lane = clamp(car.lane + dir, 0, 2);
+}
+
+function jump() {
+  if (state.mode !== 'playing' || car.air) return;
+  car.air = true;
+  car.vy = JUMP_VEL;
+}
+
+function gameOver() {
+  state.mode = 'over';
+  state.nitroTime = 0;
+  lastResult = { score: currentScore(), dist: Math.floor(state.dist), coins: state.coins, zombies: state.zombies };
+  ui.nitroBtn.classList.add('hidden');
+  setTimeout(showGameOver, 1100);
+}
+
+// =====================================================================
+//  WAS AUF DER STRASSE AUFTAUCHT
+// =====================================================================
+function obstacleType() {
+  const d = state.diff;
+  const weights = [['fence', 0.38 - 0.18 * d], ['crates', 0.3], ['wreck', 0.18 + 0.1 * d], ['barrier', 0.14 + 0.08 * d]];
+  let r = Math.random() * weights.reduce((s, w) => s + w[1], 0);
+  for (const [type, w] of weights) { if ((r -= w) <= 0) return type; }
+  return 'fence';
+}
+function coinRow(lane, z, count = 5) {
+  for (let i = 0; i < count; i++) spawnThing('coin', LANES[lane], z - i * 2.8, 0.8);
+}
+function spawnPattern(base) {
+  const z = SPAWN_Z;
+  const lanes = [0, 1, 2].sort(() => Math.random() - 0.5);
+  const r = Math.random();
+  let extra = 0;
+  if (r < 0.22) {
+    // Rampe, dahinter ein Hindernis, darüber Münzen in der Luft
+    const L = lanes[0];
+    spawnThing('ramp', LANES[L], z);
+    const behind = z - RAMP_LEN - base * 0.45;
+    spawnThing(obstacleType(), LANES[L], behind);
+    for (let k = 1; k <= 6; k++) {
+      const t = k * 0.14;
+      spawnThing('coin', LANES[L], z - RAMP_LEN - base * t, RAMP_H + RAMP_JUMP_VEL * t - 0.5 * GRAVITY * t * t + 0.8);
+    }
+    if (Math.random() < 0.5) spawnThing(obstacleType(), LANES[lanes[1]], behind);
+    extra = base * 0.8;
+  } else if (r < 0.6) {
+    spawnThing(obstacleType(), LANES[lanes[0]], z);
+    if (Math.random() < 0.7) coinRow(lanes[1], z + 4);
+  } else if (r < 0.84) {
+    spawnThing(obstacleType(), LANES[lanes[0]], z);
+    spawnThing(obstacleType(), LANES[lanes[1]], z - rand(0, 6));
+    if (Math.random() < 0.6) coinRow(lanes[2], z + 4);
+  } else {
+    coinRow(lanes[0], z, 7);
+  }
+  if (Math.random() < (state.hp < 50 ? 0.12 : 0.05)) spawnThing('kit', LANES[lanes[2]], z - 14, 0.8);
+  return extra;
+}
+function spawnZombieGroup() {
+  const horde = Math.random() < 0.12 + state.diff * 0.12;
+  const count = horde ? 2 : 1;
+  if (Math.random() < 0.35) {
+    // vom Straßenrand
+    const side = pick([-1, 1]);
+    const z = rand(-75, -45);
+    for (let i = 0; i < count; i++) spawnZombie(side * rand(5.4, 6.4), z - i * 1.4, true);
+  } else {
+    const lane = randInt(0, 2);
+    const z = SPAWN_Z + rand(-5, 5);
+    for (let i = 0; i < count; i++) spawnZombie(LANES[lane] + (horde ? (i ? 0.7 : -0.7) : 0), z - i * 1.5, false);
+  }
+}
+function spawning(dt, d, base) {
+  state.nextPattern -= d;
+  while (state.nextPattern <= 0) {
+    const extra = spawnPattern(base);
+    state.nextPattern += base * lerp(1.8, 1.05, state.diff) * rand(0.85, 1.15) + extra;
+  }
+  state.zombieTimer -= dt;
+  if (state.zombieTimer <= 0) {
+    spawnZombieGroup();
+    state.zombieTimer = (2.2 - state.diff * 1.0) * rand(0.7, 1.3);
+  }
+}
+
+// =====================================================================
+//  BEWEGUNG UND ZUSAMMENSTÖSSE
+// =====================================================================
+function updateWorld(dt, d) {
+  scrollTextures.forEach(s => { s.tex.offset.y += d / s.tile; });
+  farZ['-1'] += d; farZ['1'] += d;
+  for (const b of buildings) {
+    b.z += d;
+    b.mesh.position.z = b.z;
+    if (b.z - b.len / 2 > 22) placeBuilding(b);
+  }
+  for (const s of scenery) {
+    s.z += d;
+    if (s.z > 18) s.z -= SCENERY_SPAN;
+    s.obj.position.z = s.z;
+  }
+}
+
+function updateActive(dt, d) {
+  for (let i = active.length - 1; i >= 0; i--) {
+    const o = active[i];
+    o.z += d;
+    o.mesh.position.z = o.z;
+    if (o.kind === 'coin') o.mesh.rotation.y += dt * 4;
+    if (o.kind === 'kit') { o.phase += dt * 3; o.mesh.position.y = o.y + Math.sin(o.phase) * 0.15; o.mesh.rotation.y += dt * 1.5; }
+    if (o.dead || o.z - o.hd - RAMP_LEN > DESPAWN_Z) {
+      release(o.type, o.mesh);
+      active.splice(i, 1);
+    }
+  }
+}
+
+function updateZombies(dt, d) {
+  for (let i = zombies.length - 1; i >= 0; i--) {
+    const zb = zombies[i], m = zb.mesh, u = m.userData;
+    if (zb.flying) {
+      // comicartig durch die Luft
+      zb.vy -= 22 * dt;
+      m.position.x += zb.vx * dt; m.position.y += zb.vy * dt; m.position.z += d + zb.vz * dt;
+      m.rotation.x += zb.spinX * dt; m.rotation.z += zb.spinZ * dt;
+      if (m.position.y < -3 || m.position.z > DESPAWN_Z) { release('zombie', m); zombies.splice(i, 1); }
+      continue;
+    }
+    // auf das Auto zulaufen und in seine Spur lenken
+    let vx = 0;
+    if (zb.z > -80 && zb.z < -6) vx = clamp((LANES[car.lane] - zb.x) * 2, -zb.steer, zb.steer);
+    zb.x += vx * dt;
+    zb.z += d + zb.walk * dt;
+    m.position.set(zb.x, 0, zb.z);
+    m.rotation.y = Math.atan2(vx, zb.walk);
+    zb.phase += dt * (5 + zb.walk);
+    u.legs[0].rotation.x = Math.sin(zb.phase) * 0.6;
+    u.legs[1].rotation.x = -Math.sin(zb.phase) * 0.6;
+    u.arms[0].rotation.x = -0.4 + Math.sin(zb.phase * 0.5) * 0.15;
+    u.arms[1].rotation.x = -0.4 - Math.sin(zb.phase * 0.5) * 0.15;
+    u.head.rotation.z = Math.sin(zb.phase * 0.5) * 0.15;
+    if (zb.z > DESPAWN_Z) { release('zombie', m); zombies.splice(i, 1); }
+  }
+}
+
+function hitZombie(zb) {
+  zb.flying = true;
+  const dir = Math.sign(zb.x - car.x) || pick([-1, 1]);
+  zb.vx = dir * rand(3, 7);
+  zb.vy = rand(8, 12);
+  zb.vz = -(state.speed * 1.05 + rand(2, 6));
+  zb.spinX = rand(-10, -5); zb.spinZ = rand(-6, 6);
+  state.zombies++;
+  addNitro(ZOMBIE_NITRO);
+  spawnBits(zb.x, 0.8, zb.z, 14, MAT.goo, 0.1, 0.22, 1);
+  damage(DAMAGE.zombie);
+}
+
+function hitObstacle(o) {
+  o.dead = true;
+  spawnBits(o.x, 0.3, o.z, 12, DEBRIS_MAT[o.type], 0.2, 0.5, 1);
+  damage(DAMAGE[o.type]);
+}
+
+function collect(o) {
+  o.dead = true;
+  if (o.kind === 'coin') {
+    state.coins++;
+    addNitro(COIN_NITRO);
+    spawnBits(o.x, o.y - 0.3, o.z, 4, MAT.gold, 0.06, 0.12, 0.5);
+  } else {
+    state.hp = Math.min(MAX_HP, state.hp + REPAIR_HP);
+    toast('+' + REPAIR_HP + ' ❤', '#7dff6a');
+    spawnBits(o.x, o.y - 0.3, o.z, 8, MAT.repair, 0.08, 0.16, 0.6);
+  }
+}
+
+function checkCollisions() {
+  const grounded = car.y < 0.6;      // im Sprung fliegt man über alles drüber
+  for (const o of active) {
+    if (o.dead) continue;
+    const dx = Math.abs(o.x - car.x);
+    if (o.kind === 'obstacle') {
+      if (grounded && dx < o.hw + 0.85 && o.z + o.hd > -1.9 && o.z - o.hd < 1.9) hitObstacle(o);
+    } else if (o.kind === 'coin' || o.kind === 'kit') {
+      if (dx < 1.25 && Math.abs(o.z) < 1.8 && Math.abs(o.y - (car.y + 0.8)) < 1.4) collect(o);
+    }
+    if (state.mode !== 'playing') return;
+  }
+  for (const zb of zombies) {
+    if (zb.flying) continue;
+    if (grounded && Math.abs(zb.x - car.x) < 1.25 && zb.z > -2.3 && zb.z < 1.7) hitZombie(zb);
+    if (state.mode !== 'playing') return;
+  }
+}
+
+function updateCar(dt, d) {
+  // Spur wechseln
+  const targetX = LANES[car.lane];
+  const dx = targetX - car.x;
+  car.x += dx * Math.min(1, dt * 12);
+
+  // Rampen: Höhe auf der Rampe und Absprung am Ende
+  let groundY = 0;
+  car.onRamp = false;
+  for (const o of active) {
+    if (o.kind !== 'ramp' || Math.abs(o.x - car.x) > 1.3) continue;
+    if (o.z >= 0 && o.z <= RAMP_LEN) {
+      const h = o.z / RAMP_LEN * RAMP_H;
+      if (!car.air || car.y <= h) { groundY = Math.max(groundY, h); o.on = true; car.onRamp = true; }
+    }
+  }
+  if (car.air) {
+    car.vy -= GRAVITY * dt;
+    car.y += car.vy * dt;
+    if (car.y <= groundY) { car.y = groundY; car.vy = 0; car.air = false; }
+  } else {
+    car.y = groundY;
+  }
+  for (const o of active) {
+    if (o.kind === 'ramp' && o.on && !o.used && o.z > RAMP_LEN) {
+      o.used = true;
+      if (!car.air && Math.abs(o.x - car.x) < 1.6) { car.air = true; car.vy = RAMP_JUMP_VEL; car.y = RAMP_H; }
+    }
+  }
+
+  const m = carModel;
+  m.root.position.set(car.x, car.y, 0);
+  m.root.rotation.y = -dx * 0.12;
+  m.body.rotation.z = -dx * 0.05;
+  const pitch = car.air ? clamp(car.vy * 0.03, -0.3, 0.3) : (car.onRamp ? Math.atan2(RAMP_H, RAMP_LEN) : 0);
+  m.body.rotation.x = lerp(m.body.rotation.x, pitch, Math.min(1, dt * 10));
+  m.body.position.y = car.air ? 0 : Math.sin(clockTime * 22) * 0.015 * Math.min(1, state.speed / 20);
+  m.wheels.forEach(w => { w.rotation.x -= d / 0.45; });
+
+  // Nitro-Flammen
+  m.flames.visible = state.nitroTime > 0;
+  if (m.flames.visible) m.flames.children.forEach(f => { f.scale.set(1, 1, rand(0.7, 1.3)); });
+
+  // Schaden sichtbar machen: dunkler werden und rauchen
+  const hp = state.hp;
+  const targetDark = state.mode === 'over' ? 0.8 : hp < 25 ? 0.6 : hp < 50 ? 0.35 : 0;
+  car.dark = lerp(car.dark, targetDark, Math.min(1, dt * 3));
+  MAT.paint.color.copy(RED).lerp(BURNT, car.dark);
+  const rate = state.mode === 'over' ? 30 : state.mode !== 'playing' ? 0 : hp < 25 ? 22 : hp < 50 ? 9 : 0;
+  smokeAcc += rate * dt;
+  while (smokeAcc >= 1) { smokeAcc -= 1; emitSmoke(hp < 25 || state.mode === 'over'); }
+}
+
+function updateFx(dt) {
+  // flackernde Laternen
+  for (let i = 1; i <= 2; i++) {
+    const on = Math.sin(clockTime * (7 + i * 5)) + Math.sin(clockTime * (13 + i * 3)) > -1.2 || Math.random() < 0.3;
+    MAT.bulb[i].color.setHex(on ? 0xffd890 : 0x332a20);
+    MAT.cone[i].opacity = on ? 0.07 : 0;
+  }
+  // brennende Fässer
+  for (const s of scenery) {
+    const fires = s.obj.userData.fires;
+    if (!fires) continue;
+    fires.forEach((f, i) => {
+      const k = 0.85 + Math.sin(clockTime * (9 + i * 3) + i) * 0.2 + Math.random() * 0.1;
+      f.scale.set(0.8 * k, 1.3 * k, 1);
+    });
+  }
+  fireLights.forEach((l, i) => { l.intensity = 1.4 + Math.sin(clockTime * 11 + i * 2) * 0.3 + Math.random() * 0.3; });
+
+  // roter Rand und Wackeln
+  state.flash = Math.max(0, state.flash - dt * 2.5);
+  ui.flash.style.opacity = state.flash.toFixed(2);
+  state.shake = Math.max(0, state.shake - dt * 1.2);
+}
+
+function updateCamera(dt) {
+  const aspect = innerWidth / innerHeight;
+  const baseFov = aspect < 1 ? 64 + (1 - aspect) * 34 : 64;
+  const fov = baseFov + (state.nitroTime > 0 ? 12 : 0);
+  if (Math.abs(camera.fov - fov) > 0.01) {
+    camera.fov = lerp(camera.fov, fov, Math.min(1, dt * 4));
+    camera.updateProjectionMatrix();
+  }
+  const s = state.shake;
+  camera.position.set(car.x * 0.55 + rand(-s, s), 4.4 + car.y * 0.45 + rand(-s, s), 8.2);
+  camera.lookAt(car.x * 0.7, 1.2 + car.y * 0.35, -10);
+  skyGroup.position.set(camera.position.x, 0, camera.position.z);
+}
+
+const hudCache = {};
+function setText(el, key, value) {
+  if (hudCache[key] !== value) { hudCache[key] = value; el.textContent = value; }
+}
+function updateHUD() {
+  setText(ui.score, 'score', currentScore());
+  setText(ui.coins, 'coins', state.coins);
+  setText(ui.zombies, 'zombies', state.zombies);
+  const hp = Math.ceil(state.hp);
+  setText(ui.hpText, 'hp', hp);
+  ui.hpFill.style.width = hp + '%';
+  ui.hpFill.className = hp < 25 ? 'low' : hp < 50 ? 'mid' : '';
+  const nitroShown = state.nitroTime > 0 ? state.nitroTime / NITRO_TIME * 100 : state.nitro;
+  ui.nitroFill.style.width = nitroShown.toFixed(1) + '%';
+  const ready = state.nitro >= 100 && state.nitroTime <= 0;
+  ui.nitroBar.classList.toggle('full', ready);
+  ui.nitroBtn.classList.toggle('ready', ready);
+}
+
+// =====================================================================
+//  HAUPTSCHLEIFE
+// =====================================================================
+function update(dt) {
+  clockTime += dt;
+  if (state.mode === 'playing') {
+    state.time += dt;
+    state.diff = clamp(state.time / RAMP_TIME, 0, 1);
+  }
+  const base = lerp(SPEED_START, SPEED_MAX, state.diff);
+  state.slow += (1 - state.slow) * Math.min(1, dt * 1.6);
+  if (state.nitroTime > 0) {
+    state.nitroTime -= dt;
+    if (state.nitroTime <= 0) { state.nitroTime = 0; state.nitro = 0; }
+  }
+  if (state.mode === 'playing') {
+    state.speed = base * state.slow * (state.nitroTime > 0 ? NITRO_SPEED : 1);
+  } else {
+    state.speed = lerp(state.speed, state.mode === 'menu' ? 12 : 0, Math.min(1, dt * 1.5));
+  }
+  const d = state.speed * dt;
+  if (state.mode === 'playing') state.dist += d;
+
+  updateWorld(dt, d);
+  updateCar(dt, d);
+  if (state.mode === 'playing') spawning(dt, d, base);
+  updateActive(dt, d);
+  updateZombies(dt, d);
+  if (state.mode === 'playing') checkCollisions();
+  updateBits(dt, d);
+  updateSmoke(dt, d);
+  updateAsh(dt, d);
+  updateFx(dt);
+  updateCamera(dt);
+  if (state.mode !== 'menu') updateHUD();
+}
+
+const clock = new THREE.Clock();
+function frame() {
+  requestAnimationFrame(frame);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  update(dt);
+  renderer.render(scene, camera);
+}
+
+// =====================================================================
+//  MENÜS UND RANGLISTE
+// =====================================================================
+let boardReturn = 'menu';
+let saved = false;
+
+async function showBoard(highlight = -1, from = 'menu') {
+  boardReturn = from;
+  const list = await Leaderboard.load();
+  ui.boardBody.textContent = '';
+  if (!list.length) {
+    const tr = document.createElement('tr');
+    const td = document.createElement('td');
+    td.colSpan = 3; td.className = 'empty';
+    td.textContent = 'Noch keine Einträge – fahr los!';
+    tr.appendChild(td); ui.boardBody.appendChild(tr);
+  }
+  list.forEach((e, i) => {
+    const tr = document.createElement('tr');
+    if (i === highlight) tr.className = 'me';
+    [String(i + 1), e.name, String(e.score)].forEach(text => {
+      const td = document.createElement('td');
+      td.textContent = text;          // textContent: Namen werden nie als HTML ausgeführt
+      tr.appendChild(td);
+    });
+    ui.boardBody.appendChild(tr);
+  });
+  ui.menu.classList.add('hidden');
+  ui.over.classList.add('hidden');
+  ui.board.classList.remove('hidden');
+}
+
+async function showGameOver() {
+  const r = lastResult;
+  ui.finalScore.textContent = r.score;
+  ui.statDist.textContent = r.dist;
+  ui.statCoins.textContent = r.coins;
+  ui.statZombies.textContent = r.zombies;
+  const list = await Leaderboard.load();
+  const qualifies = r.score > 0 && (list.length < Leaderboard.SIZE || r.score > list[list.length - 1].score);
+  saved = false;
+  ui.saveBtn.disabled = false;
+  ui.nameBox.classList.toggle('hidden', !qualifies);
+  ui.nameInput.value = Store.get(NAME_KEY, '');
+  ui.overInfo.textContent = qualifies ? '' : (list.length ? 'Für Platz 10 brauchst du ' + (list[list.length - 1].score + 1) + ' Punkte.' : '');
+  ui.hud.classList.add('hidden');
+  ui.over.classList.remove('hidden');
+  if (qualifies && !isTouch) setTimeout(() => ui.nameInput.focus(), 50);
+}
+
+async function saveName() {
+  if (saved || !lastResult) return;
+  saved = true;
+  ui.saveBtn.disabled = true;
+  const name = ui.nameInput.value.replace(/[<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 12) || 'Fahrer';
+  Store.set(NAME_KEY, name);
+  const entry = { name, score: lastResult.score, coins: lastResult.coins, zombies: lastResult.zombies, distance: lastResult.dist, date: Date.now() };
+  const rank = await Leaderboard.submit(entry);
+  ui.nameBox.classList.add('hidden');
+  ui.overInfo.textContent = rank >= 0 ? 'Du bist auf Platz ' + (rank + 1) + '!' : '';
+  showBoard(rank, 'over');
+}
+
+function goToMenu() {
+  resetGame();
+  state.mode = 'menu';
+  ui.hud.classList.add('hidden');
+  ui.over.classList.add('hidden');
+  ui.board.classList.add('hidden');
+  ui.nitroBtn.classList.add('hidden');
+  ui.menu.classList.remove('hidden');
+}
+
+$('startBtn').addEventListener('click', startGame);
+$('againBtn').addEventListener('click', startGame);
+$('menuBtn').addEventListener('click', goToMenu);
+$('boardBtn').addEventListener('click', () => showBoard(-1, 'menu'));
+$('overBoardBtn').addEventListener('click', () => showBoard(-1, 'over'));
+$('boardBack').addEventListener('click', () => {
+  ui.board.classList.add('hidden');
+  (boardReturn === 'over' ? ui.over : ui.menu).classList.remove('hidden');
+});
+ui.saveBtn.addEventListener('click', saveName);
+ui.nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') saveName(); });
+
+// =====================================================================
+//  STEUERUNG
+// =====================================================================
+window.addEventListener('keydown', e => {
+  if (e.target && e.target.tagName === 'INPUT') return;
+  if (state.mode !== 'playing') return;
+  const k = e.key;
+  if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(k)) e.preventDefault();
+  if (k === 'ArrowLeft' || k === 'a' || k === 'A') { if (!e.repeat) changeLane(-1); }
+  else if (k === 'ArrowRight' || k === 'd' || k === 'D') { if (!e.repeat) changeLane(1); }
+  else if (k === ' ' || k === 'ArrowUp' || k === 'w' || k === 'W') jump();
+  else if (k === 'e' || k === 'E') activateNitro();
+});
+
+// Wischen auf dem Handy
+let touchStart = null;
+window.addEventListener('touchstart', e => {
+  if (state.mode !== 'playing' || e.target.closest('button, input')) return;
+  const t = e.changedTouches[0];
+  touchStart = { x: t.clientX, y: t.clientY };
+}, { passive: true });
+window.addEventListener('touchend', e => {
+  if (!touchStart) return;
+  const t = e.changedTouches[0];
+  const dx = t.clientX - touchStart.x, dy = t.clientY - touchStart.y;
+  touchStart = null;
+  if (Math.max(Math.abs(dx), Math.abs(dy)) < 28) return;
+  if (Math.abs(dx) > Math.abs(dy)) changeLane(dx > 0 ? 1 : -1);
+  else if (dy < 0) jump();
+  else activateNitro();
+}, { passive: true });
+ui.nitroBtn.addEventListener('pointerdown', e => { e.preventDefault(); activateNitro(); });
+
+window.addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+frame();
+</script>
 </body>
 </html>

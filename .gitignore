@@ -1,0 +1,17 @@
+# Betriebssystem
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Editoren
+.vscode/
+.idea/
+*.swp
+*~
+
+# Lokale Claude-Einstellungen
+.claude/settings.local.json
+
+# Sonstiges
+node_modules/
+*.log
