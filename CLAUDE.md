@@ -69,11 +69,14 @@ erscheinen bei `SPAWN_Z = -130` im Nebel und werden hinter der Kamera aufgeräum
 - Zombie-Takt: `(1.5 - Schwierigkeit * 0.65) * zufällig(0.7, 1.3)` Sekunden, erster Zombie
   nach ca. 1 Sekunde. Horden-Chance `0.18 + Schwierigkeit * 0.12`, Horde = 2 bis 3 Zombies.
   (Wurde mehrfach angepasst: erst zu viele, dann zu wenige, dann zu viele – jetzt Mittelweg.)
-- Hindernis-Reihen (`spawnPattern`, `spawning`): Abstand `zufällig(10, 16) - Schwierigkeit * 3`
-  Einheiten (nach Rampen zusätzlich Platz). 22 % der Reihen sind Rampen, sonst Hindernis-Reihe:
-  3 Hindernisse ab Schwierigkeit > 0.4 mit 15 % Chance, sonst 2 mit Chance
-  `0.4 + Schwierigkeit * 0.3`, sonst 1. Beim Start liegen schon Reihen alle 16 Einheiten
-  (von z = -40 bis zum Spawn-Punkt).
+- Hindernis-Reihen (`spawnPattern`, `spawning`): Abstand `zufällig(11, 15) - Schwierigkeit * 3`
+  Einheiten (nach Rampen `Tempo * 0.3` extra zum Landen). 22 % der Reihen sind Rampen, sonst
+  Hindernis-Reihe mit 1–3 Hindernissen. Der Durchschnitt pro Reihe entspricht den Chancen
+  „3 ab Schwierigkeit > 0.4 mit 15 %, sonst 2 mit `0.4 + Schwierigkeit * 0.3`, sonst 1“,
+  wird aber über ein Konto (`obstacleCount`, `state.obstacleBudget`) **gleichmäßig verteilt**
+  (Wunsch: nicht mal sehr viele und dann gar keine). Beim Start liegen schon Reihen alle
+  16 Einheiten (von z = -40 bis zum Spawn-Punkt).
+- Autolicht bewusst gedämpft (SpotLights Stärke 110, leuchtende Lampen schwächer).
 - Umgefahrene Zombies fliegen comicartig weg, grüne Teilchen, kein Blut.
 - Münze: +10 Punkte, +4 Nitro. Zombie: +5 Punkte, +3 Nitro.
 - Rote Werkzeugkiste: +25 Leben.

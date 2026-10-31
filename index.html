@@ -671,9 +671,9 @@ const MAT = {
   rubber: std(0x18181b, { roughness: 0.95 }),
   rim: std(0xffffff, { map: TEX.rim, roughness: 0.35, metalness: 0.8 }),
   // Leuchtende Teile sind heller als „weiß“ (glow()), damit der Bloom-Effekt sie zum Strahlen bringt
-  headlight: basic(glow(0xfff6d0, 6)),
+  headlight: basic(glow(0xfff6d0, 2.5)),
   tail: basic(glow(0xff2a1a, 4)),
-  roofLamp: basic(glow(0xfff2a0, 5)),
+  roofLamp: basic(glow(0xfff2a0, 2)),
   flameOuter: basic(glow(0x2a7bff, 3), Object.assign({ opacity: 0.85 }, additive)),
   flameInner: basic(glow(0xbff4ff, 4), Object.assign({ opacity: 0.9 }, additive)),
   skin: ['#7fae5a', '#93c06a', '#6e9a58', '#a2b86a'].map(c => std(c, { roughness: 0.7 })),
@@ -1019,7 +1019,7 @@ const carModel = (() => {
   });
   // Echte Scheinwerfer
   [-0.6, 0.6].forEach(x => {
-    const sp = new THREE.SpotLight(0xfff2cc, 220, 55, 0.5, 0.45, 2);
+    const sp = new THREE.SpotLight(0xfff2cc, 110, 50, 0.5, 0.5, 2);
     sp.position.set(x, 0.9, -1.9);
     sp.target.position.set(x * 1.6, 0, -20);
     root.add(sp, sp.target);
@@ -1283,7 +1283,7 @@ const state = {
   mode: 'menu',          // 'menu' | 'playing' | 'over'
   time: 0, diff: 0, speed: 12, slow: 1, dist: 0,
   coins: 0, zombies: 0, hp: MAX_HP, nitro: 0, nitroTime: 0,
-  shake: 0, flash: 0, zombieTimer: 1, nextPattern: 0
+  shake: 0, flash: 0, zombieTimer: 1, nextPattern: 0, obstacleBudget: 0
 };
 const car = { x: 0, lane: 1, y: 0, vy: 0, air: false, dark: 0, onRamp: false };
 let clockTime = 0;
@@ -1319,7 +1319,7 @@ function resetGame() {
   smoke.forEach(p => { p.s.visible = false; });
   Object.assign(state, {
     time: 0, diff: 0, slow: 1, dist: 0, coins: 0, zombies: 0, hp: MAX_HP,
-    nitro: 0, nitroTime: 0, shake: 0, flash: 0, zombieTimer: 1, nextPattern: 0
+    nitro: 0, nitroTime: 0, shake: 0, flash: 0, zombieTimer: 1, nextPattern: 0, obstacleBudget: 0
   });
   Object.assign(car, { x: 0, lane: 1, y: 0, vy: 0, air: false, dark: 0, onRamp: false });
 }
@@ -1390,9 +1390,19 @@ function obstacleType() {
 function coinRow(lane, z, count = 5) {
   for (let i = 0; i < count; i++) spawnThing('coin', LANES[lane], z - i * 2.8, 0.8);
 }
+// Durchschnittliche Hindernisse pro Reihe (aus den Chancen für 2 und 3 Hindernisse).
+// Über ein „Konto“ wird das gleichmäßig verteilt, statt mal 3 Reihen voll und dann viel leer.
+function obstacleCount(maxCount) {
+  const d = state.diff;
+  const p3 = d > 0.4 ? 0.15 : 0;
+  const expected = 1 + (1 - p3) * (0.4 + d * 0.3) + 2 * p3;
+  state.obstacleBudget += expected;
+  const count = clamp(Math.round(state.obstacleBudget + rand(-0.3, 0.3)), 1, maxCount);
+  state.obstacleBudget -= count;
+  return count;
+}
 function spawnPattern(base, z = SPAWN_Z) {
   const lanes = [0, 1, 2].sort(() => Math.random() - 0.5);
-  const d = state.diff;
   let extra = 0;
   if (Math.random() < 0.22) {
     // Rampe, dahinter ein Hindernis, darüber Münzen in der Luft
@@ -1404,13 +1414,11 @@ function spawnPattern(base, z = SPAWN_Z) {
       const t = k * 0.14;
       spawnThing('coin', LANES[L], z - RAMP_LEN - base * t, RAMP_H + RAMP_JUMP_VEL * t - 0.5 * GRAVITY * t * t + 0.8);
     }
-    if (Math.random() < 0.5) spawnThing(obstacleType(), LANES[lanes[1]], behind);
-    extra = base * 0.8;
+    if (obstacleCount(2) === 2) spawnThing(obstacleType(), LANES[lanes[1]], behind);
+    extra = base * 0.3;          // etwas Platz zum Landen
   } else {
     // Hindernis-Reihe mit 1, 2 oder 3 Hindernissen
-    let count = 1;
-    if (d > 0.4 && Math.random() < 0.15) count = 3;
-    else if (Math.random() < 0.4 + d * 0.3) count = 2;
+    const count = obstacleCount(3);
     for (let i = 0; i < count; i++) spawnThing(obstacleType(), LANES[lanes[i]], z - (i ? rand(0, 4) : 0));
     if (count < 3 && Math.random() < 0.6) coinRow(lanes[2], z + 4);
   }
@@ -1435,7 +1443,7 @@ function spawning(dt, d, base) {
   state.nextPattern -= d;
   while (state.nextPattern <= 0) {
     const extra = spawnPattern(base);
-    state.nextPattern += rand(10, 16) - state.diff * 3 + extra;
+    state.nextPattern += rand(11, 15) - state.diff * 3 + extra;
   }
   state.zombieTimer -= dt;
   if (state.zombieTimer <= 0) {
