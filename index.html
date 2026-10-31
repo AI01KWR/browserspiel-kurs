@@ -137,6 +137,7 @@
   .car-title { font-family: "Bungee", sans-serif; font-size: 20px; margin: 2px 0 8px; }
   .rarity { font-family: "Bungee", sans-serif; font-size: 13px; padding: 2px 8px; border-radius: 8px; color: #111; vertical-align: middle; }
   .big-rarity { display: inline-block; font-size: 18px; padding: 4px 14px; margin-top: 4px; }
+  .perk { font-size: 13px; color: #7fe6ff; margin: -4px 0 8px; }
   .car-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 4px; }
   .tile {
     min-height: 54px; padding: 6px 4px; border-radius: 12px; cursor: pointer;
@@ -249,6 +250,7 @@
   <div class="panel">
     <h2>🚗 Garage</h2>
     <div class="car-title"><span id="garageName">Auto</span> <span class="rarity" id="garageRarity"></span></div>
+    <div class="perk" id="garagePerk"></div>
     <div class="car-grid" id="garageGrid"></div>
     <button class="btn green" id="selectBtn">Auswählen</button>
     <button class="btn alt" id="garageBack">Zurück</button>
@@ -268,6 +270,7 @@
     <div id="shopResult" class="hidden">
       <div class="rarity big-rarity" id="resultRarity"></div>
       <div class="car-title" id="resultName"></div>
+      <div class="perk" id="resultPerk"></div>
       <p class="sub" id="resultInfo"></p>
       <button class="btn" id="chestAgainBtn">Noch eine Kiste</button>
     </div>
@@ -1427,23 +1430,38 @@ const RARITY = {
   mythic:    { name: 'Mythisch',   color: '#ff2bd6', chance: 0.0001, refund: 5000 }   // 0,01 %
 };
 const CARS = [
-  { id: 'starter',     name: 'Zombie-Brecher',     rarity: 'starter',   build: buildStarter },
-  { id: 'pickup',      name: 'Pickup',             rarity: 'common',    build: buildPickup },
-  { id: 'kombi',       name: 'Alter Kombi',        rarity: 'common',    build: buildKombi },
-  { id: 'taxi',        name: 'Taxi',               rarity: 'common',    build: buildTaxi },
-  { id: 'police',      name: 'Polizeiauto',        rarity: 'rare',      build: buildPolice },
-  { id: 'offroad',     name: 'Geländewagen',       rarity: 'rare',      build: buildOffroad },
-  { id: 'monster',     name: 'Monstertruck',       rarity: 'epic',      build: buildMonster },
-  { id: 'transporter', name: 'Panzer-Transporter', rarity: 'epic',      build: buildTransporter },
-  { id: 'muscle',      name: 'Flammen-Muscle-Car', rarity: 'legendary', build: buildMuscle },
-  { id: 'phantom',     name: 'Phantom-Hoverauto',  rarity: 'mythic',    build: buildPhantom }
+// Vorteile (perk): je seltener, desto stärker. Das Startauto hat keinen Vorteil.
+//   maxHp = Leben, dmg = Schaden-Faktor je Hindernisart, nitroGain = Nitro füllt schneller,
+//   nitroTime = Sekunden mehr Nitro, repair = Leben mehr pro Werkzeugkiste, magnet = Sammelradius
+  { id: 'starter',     name: 'Zombie-Brecher',     rarity: 'starter',   build: buildStarter,
+    perk: { text: 'Kein Vorteil – dein treues Startauto' } },
+  { id: 'pickup',      name: 'Pickup',             rarity: 'common',    build: buildPickup,
+    perk: { text: 'Sammelt Münzen aus größerer Entfernung (+40 %)', magnet: 1.4 } },
+  { id: 'kombi',       name: 'Alter Kombi',        rarity: 'common',    build: buildKombi,
+    perk: { text: '+10 Leben pro Werkzeugkiste', repair: 10 } },
+  { id: 'taxi',        name: 'Taxi',               rarity: 'common',    build: buildTaxi,
+    perk: { text: 'Nitro-Leiste füllt sich 15 % schneller', nitroGain: 1.15 } },
+  { id: 'police',      name: 'Polizeiauto',        rarity: 'rare',      build: buildPolice,
+    perk: { text: 'Zombies machen 30 % weniger Schaden', dmg: { zombie: 0.7 } } },
+  { id: 'offroad',     name: 'Geländewagen',       rarity: 'rare',      build: buildOffroad,
+    perk: { text: '120 statt 100 Leben', maxHp: 120 } },
+  { id: 'monster',     name: 'Monstertruck',       rarity: 'epic',      build: buildMonster,
+    perk: { text: 'Zäune und Kisten machen nur halben Schaden', dmg: { fence: 0.5, crates: 0.5 } } },
+  { id: 'transporter', name: 'Panzer-Transporter', rarity: 'epic',      build: buildTransporter,
+    perk: { text: '135 statt 100 Leben', maxHp: 135 } },
+  { id: 'muscle',      name: 'Flammen-Muscle-Car', rarity: 'legendary', build: buildMuscle,
+    perk: { text: 'Nitro 1 s länger und die Leiste füllt sich 25 % schneller', nitroTime: 1, nitroGain: 1.25 } },
+  { id: 'phantom',     name: 'Phantom-Hoverauto',  rarity: 'mythic',    build: buildPhantom,
+    perk: { text: 'Schwebt: Zombies machen keinen Schaden, Nitro füllt sich 30 % schneller', dmg: { zombie: 0 }, nitroGain: 1.3 } }
 ];
 const CAR_BY_ID = Object.fromEntries(CARS.map(c => [c.id, c]));
 const rarityName = r => r === 'starter' ? 'Startauto' : RARITY[r].name;
 const rarityColor = r => r === 'starter' ? '#ff6a3a' : RARITY[r].color;
 
 function buildCar(id, withLights) {
-  const c = (CAR_BY_ID[id] || CAR_BY_ID.starter).build();
+  const def = CAR_BY_ID[id] || CAR_BY_ID.starter;
+  const c = def.build();
+  c.id = def.id;
   if (withLights) {
     // Echte Scheinwerfer (nur im Spiel, nicht im Showroom). Ohne Abschwächung (decay 0),
     // damit nahe Hindernisse nicht überstrahlt werden und man sie gut erkennt.
@@ -1708,7 +1726,7 @@ function updateAsh(dt, d) {
 const state = {
   mode: 'menu',          // 'menu' | 'playing' | 'over'
   time: 0, diff: 0, speed: 12, slow: 1, dist: 0,
-  coins: 0, zombies: 0, hp: MAX_HP, nitro: 0, nitroTime: 0,
+  coins: 0, zombies: 0, hp: MAX_HP, maxHp: MAX_HP, nitro: 0, nitroTime: 0,
   shake: 0, flash: 0, zombieTimer: 1, nextPattern: 0, obstacleBudget: 0
 };
 const car = { x: 0, lane: 1, y: 0, vy: 0, air: false, dark: 0, onRamp: false };
@@ -1724,10 +1742,10 @@ const ui = {
   finalScore: $('finalScore'), statDist: $('statDist'), statCoins: $('statCoins'), statZombies: $('statZombies'),
   nameBox: $('nameBox'), nameInput: $('nameInput'), saveBtn: $('saveBtn'), overInfo: $('overInfo'),
   menuCoins: $('menuCoins'), coinGain: $('coinGain'), overCoins: $('overCoins'),
-  garage: $('garageScreen'), garageGrid: $('garageGrid'), garageName: $('garageName'), garageRarity: $('garageRarity'), selectBtn: $('selectBtn'),
+  garage: $('garageScreen'), garageGrid: $('garageGrid'), garageName: $('garageName'), garageRarity: $('garageRarity'), garagePerk: $('garagePerk'), selectBtn: $('selectBtn'),
   shop: $('shopScreen'), shopPanel: $('shopPanel'), shopBuy: $('shopBuy'), shopResult: $('shopResult'), shopCoins: $('shopCoins'),
   odds: $('odds'), chestBtn: $('chestBtn'), chestAgainBtn: $('chestAgainBtn'),
-  resultRarity: $('resultRarity'), resultName: $('resultName'), resultInfo: $('resultInfo'),
+  resultRarity: $('resultRarity'), resultName: $('resultName'), resultPerk: $('resultPerk'), resultInfo: $('resultInfo'),
   upgrade: $('upgradeScreen'), upgradeList: $('upgradeList'), upgradeCoins: $('upgradeCoins')
 };
 
@@ -1750,7 +1768,7 @@ function resetGame() {
   bits.forEach(b => { b.m.visible = false; });
   smoke.forEach(p => { p.s.visible = false; });
   Object.assign(state, {
-    time: 0, diff: 0, slow: 1, dist: 0, coins: 0, zombies: 0, hp: MAX_HP,
+    time: 0, diff: 0, slow: 1, dist: 0, coins: 0, zombies: 0, hp: MAX_HP, maxHp: MAX_HP,
     nitro: 0, nitroTime: 0, shake: 0, flash: 0, zombieTimer: 1, nextPattern: 0, obstacleBudget: 0
   });
   Object.assign(car, { x: 0, lane: 1, y: 0, vy: 0, air: false, dark: 0, onRamp: false });
@@ -1760,6 +1778,10 @@ function startGame() {
   if (document.activeElement) document.activeElement.blur();
   resetGame();
   upg = Upgrades.load();      // gekaufte Upgrades für diese Fahrt
+  const selected = Garage.load().selected;
+  if (carModel.id !== selected) setPlayerCar(selected);
+  perk = CAR_BY_ID[selected].perk;   // Vorteil des gewählten Autos
+  state.maxHp = state.hp = perk.maxHp || MAX_HP;
   state.mode = 'playing';
   // Startreihen, damit die Straße nicht leer ist, bis die ersten Dinge aus dem Nebel kommen
   for (let z = -40; z > SPAWN_Z; z -= 16) spawnPattern(SPEED_START, z);
@@ -1770,13 +1792,16 @@ function startGame() {
 
 // Gekaufte Upgrades (werden bei jedem Start neu geladen)
 let upg = Upgrades.load();
+let perk = {};
 function damageFor(kind) {
   let amount = DAMAGE[kind];
   if (kind === 'zombie') amount -= upg.ram * 2;     // Rammbügel
+  if (perk.dmg && perk.dmg[kind] !== undefined) amount *= perk.dmg[kind];   // Vorteil des Autos
   return amount * (1 - upg.armor * 0.05);           // Panzerung
 }
-const nitroDuration = () => NITRO_TIME + upg.nitro * 0.5;
-const repairAmount = () => REPAIR_HP + upg.repair * 5;
+const nitroDuration = () => NITRO_TIME + upg.nitro * 0.5 + (perk.nitroTime || 0);
+const repairAmount = () => REPAIR_HP + upg.repair * 5 + (perk.repair || 0);
+const hpShare = () => state.hp / state.maxHp;     // Leben als Anteil (0 bis 1)
 
 function damage(amount) {
   if (state.mode !== 'playing') return;
@@ -1791,7 +1816,7 @@ function damage(amount) {
 function addNitro(v) {
   if (state.nitroTime > 0) return;
   const before = state.nitro;
-  state.nitro = Math.min(100, state.nitro + v);
+  state.nitro = Math.min(100, state.nitro + v * (perk.nitroGain || 1));
   if (before < 100 && state.nitro >= 100) toast(isTouch ? 'Nitro bereit!' : 'Nitro bereit! (E)', '#7fe6ff');
 }
 
@@ -1866,7 +1891,7 @@ function spawnPattern(base, z = SPAWN_Z) {
     for (let i = 0; i < count; i++) spawnThing(obstacleType(), LANES[lanes[i]], z - (i ? rand(0, 4) : 0));
     if (count < 3 && Math.random() < 0.6) coinRow(lanes[2], z + 4);
   }
-  if (Math.random() < (state.hp < 50 ? 0.12 : 0.05)) spawnThing('kit', LANES[lanes[2]], z - 14, 0.8);
+  if (Math.random() < (hpShare() < 0.5 ? 0.12 : 0.05)) spawnThing('kit', LANES[lanes[2]], z - 14, 0.8);
   return extra;
 }
 function spawnZombieGroup() {
@@ -1982,7 +2007,7 @@ function collect(o) {
     addNitro(COIN_NITRO);
     spawnBits(o.x, o.y - 0.3, o.z, 4, MAT.gold, 0.06, 0.12, 0.5);
   } else {
-    state.hp = Math.min(MAX_HP, state.hp + repairAmount());
+    state.hp = Math.min(state.maxHp, state.hp + repairAmount());
     toast('+' + repairAmount() + ' ❤', '#7dff6a');
     spawnBits(o.x, o.y - 0.3, o.z, 8, MAT.repair, 0.08, 0.16, 0.6);
   }
@@ -1996,7 +2021,8 @@ function checkCollisions() {
     if (o.kind === 'obstacle') {
       if (grounded && dx < o.hw + 0.85 && o.z + o.hd > -1.9 && o.z - o.hd < 1.9) hitObstacle(o);
     } else if (o.kind === 'coin' || o.kind === 'kit') {
-      if (dx < 1.25 && Math.abs(o.z) < 1.8 && Math.abs(o.y - (car.y + 0.8)) < 1.4) collect(o);
+      const reach = perk.magnet || 1;
+      if (dx < 1.25 * reach && Math.abs(o.z) < 1.8 * reach && Math.abs(o.y - (car.y + 0.8)) < 1.4 * reach) collect(o);
     }
     if (state.mode !== 'playing') return;
   }
@@ -2052,13 +2078,14 @@ function updateCar(dt, d) {
 
   // Schaden sichtbar machen: dunkler werden und rauchen
   const hp = state.hp;
-  const targetDark = state.mode === 'over' ? 0.8 : hp < 25 ? 0.6 : hp < 50 ? 0.35 : 0;
+  const share = hpShare();
+  const targetDark = state.mode === 'over' ? 0.8 : share < 0.25 ? 0.6 : share < 0.5 ? 0.35 : 0;
   car.dark = lerp(car.dark, targetDark, Math.min(1, dt * 3));
   carModel.paint.color.copy(carModel.baseColor).lerp(BURNT, car.dark);
   if (carModel.update) carModel.update(clockTime);
-  const rate = state.mode === 'over' ? 30 : state.mode !== 'playing' ? 0 : hp < 25 ? 22 : hp < 50 ? 9 : 0;
+  const rate = state.mode === 'over' ? 30 : state.mode !== 'playing' ? 0 : share < 0.25 ? 22 : share < 0.5 ? 9 : 0;
   smokeAcc += rate * dt;
-  while (smokeAcc >= 1) { smokeAcc -= 1; emitSmoke(hp < 25 || state.mode === 'over'); }
+  while (smokeAcc >= 1) { smokeAcc -= 1; emitSmoke(share < 0.25 || state.mode === 'over'); }
 }
 
 function updateFx(dt) {
@@ -2116,8 +2143,8 @@ function updateHUD() {
   setText(ui.zombies, 'zombies', state.zombies);
   const hp = Math.ceil(state.hp);
   setText(ui.hpText, 'hp', hp);
-  ui.hpFill.style.width = hp + '%';
-  ui.hpFill.className = hp < 25 ? 'low' : hp < 50 ? 'mid' : '';
+  ui.hpFill.style.width = (hpShare() * 100).toFixed(1) + '%';
+  ui.hpFill.className = hpShare() < 0.25 ? 'low' : hpShare() < 0.5 ? 'mid' : '';
   const nitroShown = state.nitroTime > 0 ? state.nitroTime / nitroDuration() * 100 : state.nitro;
   ui.nitroFill.style.width = nitroShown.toFixed(1) + '%';
   const ready = state.nitro >= 100 && state.nitroTime <= 0;
@@ -2446,6 +2473,7 @@ function renderGarage() {
   ui.garageName.textContent = owned ? def.name : '???';
   ui.garageRarity.textContent = rarityName(def.rarity);
   ui.garageRarity.style.background = rarityColor(def.rarity);
+  ui.garagePerk.textContent = (def.id === 'starter' ? '' : '⚡ ') + def.perk.text;
   ui.selectBtn.disabled = !owned || g.selected === garageView;
   ui.selectBtn.textContent = !owned ? 'Noch nicht gefunden' : g.selected === garageView ? 'Ausgewählt ✓' : 'Auswählen';
   displayCar(garageView, !owned);
@@ -2515,6 +2543,7 @@ function showChestResult() {
   ui.resultRarity.textContent = info.name;
   ui.resultRarity.style.background = info.color;
   ui.resultName.textContent = r.def.name;
+  ui.resultPerk.textContent = '⚡ ' + r.def.perk.text;
   ui.resultInfo.textContent = r.dup
     ? 'Schon in deiner Garage – du bekommst ' + fmt(info.refund) + ' 🪙 zurück.'
     : 'NEU! Jetzt in deiner Garage.';

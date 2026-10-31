@@ -116,7 +116,14 @@ erscheinen bei `SPAWN_Z = -130` im Nebel und werden hinter der Kamera aufgeräum
 - Autos: Startauto „Zombie-Brecher“ (rot) + Pickup, Alter Kombi, Taxi (gewöhnlich),
   Polizeiauto, Geländewagen (selten), Monstertruck, Panzer-Transporter (episch),
   Flammen-Muscle-Car (legendär), Phantom-Hoverauto (mythisch, schwebt, Neon). Alle aus eigenen Bauteilen (keine Modelldateien).
-  Sie unterscheiden sich **nur im Aussehen**; Zusammenstöße nutzen immer dieselben Maße.
+  Zusammenstöße nutzen immer dieselben Maße. **Jedes Auto außer dem Startauto hat einen
+  Vorteil** (`perk` in `CARS`, je seltener desto stärker):
+  Pickup Sammelradius +40 %, Kombi +10 Leben pro Werkzeugkiste, Taxi Nitro +15 % schneller,
+  Polizei Zombies −30 % Schaden, Geländewagen 120 Leben, Monstertruck Zäune/Kisten halber
+  Schaden, Transporter 135 Leben, Muscle Car Nitro +1 s und +25 % schneller,
+  Phantom Zombies 0 Schaden und Nitro +30 % schneller.
+  Umsetzung: `perk` wird in `startGame` geladen; `damageFor`, `nitroDuration`, `repairAmount`,
+  `addNitro`, Sammelradius in `checkCollisions`, `state.maxHp`/`hpShare()`.
 - Garage (`zombie-highway-garage`: `owned`, `selected`): eigene Autos farbig, fehlende als
   Silhouette mit „?“ und Seltenheit. Das gezeigte Auto dreht sich in der Showroom-Szene.
 - Showroom: eigene Szene `showScene`, wird über denselben Composer gezeichnet
@@ -127,9 +134,20 @@ erscheinen bei `SPAWN_Z = -130` im Nebel und werden hinter der Kamera aufgeräum
   Werkzeugkiste/Stufe (200/400/700). Umsetzung in `damageFor`, `nitroDuration`, `repairAmount`.
 - Balance-Schätzung: ca. 100–250 Münzen pro Fahrt → 4–10 Fahrten pro Kiste.
 
+## Geplant: Online-Rangliste + Rang-Autos (vom Besitzer gewünscht, noch nicht gebaut)
+- Supabase (Frankfurt), nur Web-Anfragen per `fetch`, keine Bibliothek. Nur
+  `Leaderboard.load()`/`submit()` ersetzen; ohne Internet lokale Liste.
+- Vorgeschlagene Regeln (vom Besitzer noch zu bestätigen): Prüfung auf dem Server
+  (Punkte = Strecke + Münzen × 10 + Zombies × 5, Strecke ≤ Fahrzeit × Höchsttempo × Nitro,
+  max. ~6 Münzen und ~4 Zombies pro Sekunde), ein Eintrag (bestes Ergebnis) pro Spieler,
+  max. ein Ergebnis pro 30 s, Namensregeln + Schimpfwortfilter, geheime Spieler-ID pro Gerät.
+- Der Besitzer legt das Supabase-Konto selbst an und schickt nur Project URL und anon key
+  (nie service_role-Schlüssel oder Datenbank-Passwort).
+- Rang-Autos: Top 100, Top 10, Platz 1, 2, 3 – man bekommt **nur das beste** passende Auto;
+  wer aus der Liste fällt, verliert es wieder. Auch diese Autos bekommen Vorteile.
+
 ## Ideen für später (nur nach Absprache)
 - Sounds und Musik
-- Kleine Unterschiede zwischen den Autos (z. B. etwas mehr Leben, längeres Nitro, max. 10–20 %)
 - Echte 3D-Modelle (CC0) – Schritt 3 des Grafik-Umbaus, noch offen; vor Downloads fragen
 - Weitere Power-ups (z. B. Münzmagnet)
 - Einstellung für niedrigere Grafikqualität
