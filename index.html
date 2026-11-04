@@ -2649,5 +2649,10 @@ window.ZH = { state, car, active, zombies, startGame, damage, activateNitro, spa
 
 frame();
 </script>
+<!-- ADMIN START -->
+<style>#adminPanel{position:fixed;top:10px;right:10px;width:280px;background:#111;color:#fff;border:2px solid #ffcc00;border-radius:12px;padding:14px;z-index:99999;display:none}#adminPanel button{width:100%;padding:8px;margin:4px 0;background:#ffcc00;border:0;border-radius:8px;font-weight:bold}#adminPanel input{width:100%;padding:7px;margin:4px 0;border-radius:6px;background:#222;color:#fff}</style>
+<div id="adminPanel"><h3 style="color:#ffcc00;margin:0">🧟 ADMIN PANEL</h3><p>Passwort: zombie123</p><input id="adminPass" type="password" placeholder="Passwort"><button onclick="adminLogin()">Einloggen</button><div id="adminContent" style="display:none"><p>✅ Du bist Admin!</p><button onclick="alert('Leben: 100, Zombie: 10, Zaun: 15')">Einstellungen ansehen</button></div></div>
+<script>if(window.location.search.includes("admin=zombie123")){document.getElementById("adminPanel").style.display="block"}function adminLogin(){if(document.getElementById("adminPass").value==="zombie123"){document.getElementById("adminContent").style.display="block";alert("Eingeloggt!")}else{alert("Falsches Passwort!")}}</script>
+<!-- ADMIN ENDE -->
 </body>
 </html>
