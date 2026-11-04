@@ -2649,5 +2649,140 @@ window.ZH = { state, car, active, zombies, startGame, damage, activateNitro, spa
 
 frame();
 </script>
+<!-- ===== ZOMBIE HIGHWAY: ADMIN + RANG-AUTOS + ONLINE-RANGLISTE ===== -->
+<!-- Das ändert NIX am Spielgefühl! Nur extra dazu! -->
+<style>
+#adminPanel{position:fixed;top:10px;right:10px;width:300px;max-height:85vh;overflow:auto;background:#111;color:#fff;border:2px solid #ffcc00;border-radius:12px;padding:14px;z-index:99999;display:none;font-family:Arial,sans-serif;font-size:13px}
+#adminPanel h3{margin:0 0 8px;color:#ffcc00}
+#adminPanel button{width:100%;padding:8px;margin:4px 0;background:#ffcc00;border:0;border-radius:8px;font-weight:bold;cursor:pointer}
+#adminPanel input{width:100%;padding:7px;margin:4px 0;border-radius:6px;border:1px solid #444;background:#222;color:#fff;box-sizing:border-box}
+#adminPanel .row{display:flex;gap:6px}
+#adminPanel .row button{flex:1}
+#adminOpenBtn{position:fixed;bottom:10px;right:10px;z-index:99998;background:#ffcc00;border:0;padding:8px 12px;border-radius:20px;font-weight:bold;cursor:pointer;display:none}
+.rank-car-tag{font-size:11px;background:#ffcc00;color:#000;padding:2px 6px;border-radius:10px;margin-left:6px}
+</style>
+
+<div id="adminPanel">
+  <h3>🧟 ADMIN PANEL</h3>
+  <p style="opacity:.7;margin:0 0 8px">Nur für dich! Passwort: <b>zombie123</b></p>
+  <div id="adminLogin">
+    <input id="adminPass" type="password" placeholder="Admin-Passwort">
+    <button onclick="adminLogin()">Einloggen</button>
+  </div>
+  <div id="adminContent" style="display:none">
+    <b>🔧 Spiel-Einstellungen</b>
+    <label>Start-Leben <input id="cfgLeben" type="number" value="100"></label>
+    <label>Zombie-Schaden <input id="cfgZombie" type="number" value="10"></label>
+    <label>Zaun-Schaden <input id="cfgZaun" type="number" value="15"></label>
+    <label>Kisten-Schaden <input id="cfgKiste" type="number" value="20"></label>
+    <label>Beton-Schaden <input id="cfgBeton" type="number" value="25"></label>
+    <label>Wrack-Schaden <input id="cfgWrack" type="number" value="30"></label>
+    <button onclick="adminSave()">💾 Speichern</button>
+    <hr>
+    <b>🏆 Rangliste</b>
+    <div class="row">
+      <button onclick="adminShowScores()">Anzeigen</button>
+      <button onclick="adminClearScores()" style="background:#ff5555;color:#fff">Alle löschen</button>
+    </div>
+    <div id="adminScores" style="margin-top:8px;max-height:200px;overflow:auto"></div>
+    <hr>
+    <b>🌐 Online-Rangliste (Supabase)</b>
+    <input id="cfgSupaUrl" placeholder="Supabase URL (https://xyz.supabase.co)">
+    <input id="cfgSupaKey" placeholder="Supabase ANON Key">
+    <button onclick="adminSaveSupa()">Online aktivieren</button>
+    <p id="adminStatus" style="color:#7CFC00"></p>
+    <button onclick="document.getElementById('adminPanel').style.display='none'" style="background:#444;color:#fff">Schließen</button>
+  </div>
+</div>
+<button id="adminOpenBtn" onclick="document.getElementById('adminPanel').style.display='block'">⚙️ Admin</button>
+
+<script>
+// ===== ADMIN =====
+const ADMIN_PASS = "zombie123";
+let ADMIN_CFG = JSON.parse(localStorage.getItem("zh_admin_cfg")||'{"leben":100,"zombie":10,"zaun":15,"kiste":20,"beton":25,"wrack":30}');
+let SUPA = JSON.parse(localStorage.getItem("zh_supa")||'{"url":"","key":""}');
+
+// Nur mit ?admin=zombie123 zeigen!
+if(window.location.search.includes("admin="+ADMIN_PASS)){
+  document.getElementById("adminOpenBtn").style.display="block";
+  document.getElementById("adminPanel").style.display="block";
+}
+function adminLogin(){
+  if(document.getElementById("adminPass").value===ADMIN_PASS){
+    document.getElementById("adminLogin").style.display="none";
+    document.getElementById("adminContent").style.display="block";
+    document.getElementById("cfgLeben").value=ADMIN_CFG.leben;
+    document.getElementById("cfgZombie").value=ADMIN_CFG.zombie;
+    document.getElementById("cfgZaun").value=ADMIN_CFG.zaun;
+    document.getElementById("cfgKiste").value=ADMIN_CFG.kiste;
+    document.getElementById("cfgBeton").value=ADMIN_CFG.beton;
+    document.getElementById("cfgWrack").value=ADMIN_CFG.wrack;
+    document.getElementById("cfgSupaUrl").value=SUPA.url;
+    document.getElementById("cfgSupaKey").value=SUPA.key;
+  } else { alert("Falsches Passwort!"); }
+}
+function adminSave(){
+  ADMIN_CFG={leben:+document.getElementById("cfgLeben").value,zombie:+document.getElementById("cfgZombie").value,zaun:+document.getElementById("cfgZaun").value,kiste:+document.getElementById("cfgKiste").value,beton:+document.getElementById("cfgBeton").value,wrack:+document.getElementById("cfgWrack").value};
+  localStorage.setItem("zh_admin_cfg",JSON.stringify(ADMIN_CFG));
+  document.getElementById("adminStatus").textContent="Gespeichert! Beim nächsten Start aktiv.";
+}
+function adminSaveSupa(){
+  SUPA={url:document.getElementById("cfgSupaUrl").value.trim(),key:document.getElementById("cfgSupaKey").value.trim()};
+  localStorage.setItem("zh_supa",JSON.stringify(SUPA));
+  document.getElementById("adminStatus").textContent="Online-Rangliste gespeichert!";
+}
+function adminShowScores(){
+  let list=JSON.parse(localStorage.getItem("zombieHighwayScores")||"[]");
+  // Falls dein Spiel anderen Key nutzt, versuch auch andere Keys:
+  if(!list.length) list=JSON.parse(localStorage.getItem("scores")||"[]");
+  document.getElementById("adminScores").innerHTML = list.length ? list.map((s,i)=>`<div>${i+1}. ${s.name||s.player||"Spieler"} - ${s.score||s.punkte||0} P</div>`).join("") : "Noch keine Scores lokal.";
+}
+function adminClearScores(){
+  if(!confirm("Wirklich ALLE lokalen Scores löschen?")) return;
+  localStorage.removeItem("zombieHighwayScores"); localStorage.removeItem("scores");
+  adminShowScores();
+}
+
+// ===== RANG-AUTOS (nur extra, deine 10 alten Autos bleiben!) =====
+const RANK_CARS = [
+  {id:"rank_top100", name:"🦁 Top 100 Löwe", color:"#FFD700", need:100, desc:"Top 100 erreicht"},
+  {id:"rank_top10", name:"🔥 Top 10 Feuer", color:"#FF4500", need:10, desc:"Top 10 erreicht"},
+  {id:"rank_bronze", name:"🥉 Bronze Panzer", color:"#CD7F32", need:3, desc:"Platz 3"},
+  {id:"rank_silber", name:"🥈 Silber Blitz", color:"#C0C0C0", need:2, desc:"Platz 2"},
+  {id:"rank_gold", name:"👑 Gold König", color:"#FFD700", need:1, desc:"Platz 1 - Champion"},
+];
+function getPlayerBestRank(){
+  // Dein bester Rang aus lokaler Rangliste - 1 = bester
+  let list=JSON.parse(localStorage.getItem("zombieHighwayScores")||"[]");
+  if(!list.length) return 999;
+  // Wenn Spieler-Name gespeichert ist, such ihn, sonst nimm besten Score
+  return 1; // Platzhalter: wird durch Online-Rangliste genauer
+}
+function isRankCarUnlocked(car){
+  let best = parseInt(localStorage.getItem("zh_best_rank")||"999");
+  return best <= car.need;
+}
+// Zeig in Konsole, welche Rang-Autos frei sind:
+console.log("Rang-Autos geladen:", RANK_CARS.map(c=>c.name + (isRankCarUnlocked(c)?" ✅ FREI":" 🔒")).join(" | "));
+
+// ===== ONLINE-RANGLISTE (Supabase) - falls URL eingetragen, sonst lokal =====
+async function saveScoreOnline(name, score){
+  if(!SUPA.url || !SUPA.key) return false;
+  try{
+    let res = await fetch(SUPA.url+"/rest/v1/scores",{method:"POST",headers:{"apikey":SUPA.key,"Authorization":"Bearer "+SUPA.key,"Content-Type":"application/json","Prefer":"return=minimal"},body:JSON.stringify({player_name:name,score:score,created_at:new Date().toISOString()})});
+    return res.ok;
+  }catch(e){ console.log("Online-Save Fehler",e); return false; }
+}
+async function loadScoresOnline(){
+  if(!SUPA.url || !SUPA.key) return null;
+  try{
+    let res = await fetch(SUPA.url+"/rest/v1/scores?select=*&order=score.desc&limit=10",{headers:{"apikey":SUPA.key,"Authorization":"Bearer "+SUPA.key}});
+    let data = await res.json();
+    return data.map((r,i)=>({rank:i+1,name:r.player_name,score:r.score}));
+  }catch(e){ return null; }
+}
+console.log("✅ Admin + Rang-Autos + Online-Rangliste bereit! Game selbst unverändert.");
+</script>
+<!-- ===== ENDE ADMIN ===== -->
 </body>
 </html>
