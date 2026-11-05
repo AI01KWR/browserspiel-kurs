@@ -2649,10 +2649,51 @@ window.ZH = { state, car, active, zombies, startGame, damage, activateNitro, spa
 
 frame();
 </script>
-<!-- ADMIN START -->
-<style>#adminPanel{position:fixed;top:10px;right:10px;width:280px;background:#111;color:#fff;border:2px solid #ffcc00;border-radius:12px;padding:14px;z-index:99999;display:none}#adminPanel button{width:100%;padding:8px;margin:4px 0;background:#ffcc00;border:0;border-radius:8px;font-weight:bold}#adminPanel input{width:100%;padding:7px;margin:4px 0;border-radius:6px;background:#222;color:#fff}</style>
-<div id="adminPanel"><h3 style="color:#ffcc00;margin:0">🧟 ADMIN PANEL</h3><p>Passwort: zombie123</p><input id="adminPass" type="password" placeholder="Passwort"><button onclick="adminLogin()">Einloggen</button><div id="adminContent" style="display:none"><p>✅ Du bist Admin!</p><button onclick="alert('Leben: 100, Zombie: 10, Zaun: 15')">Einstellungen ansehen</button></div></div>
-<script>if(window.location.search.includes("admin=zombie123")){document.getElementById("adminPanel").style.display="block"}function adminLogin(){if(document.getElementById("adminPass").value==="zombie123"){document.getElementById("adminContent").style.display="block";alert("Eingeloggt!")}else{alert("Falsches Passwort!")}}</script>
-<!-- ADMIN ENDE -->
+// ADMIN PANEL - NEU
+// Nur sichtbar mit ?admin=zombie123
+
+if (window.location.search.includes("admin=zombie123")) {
+  
+  // Panel erstellen
+  let panel = document.createElement("div");
+  panel.style.cssText = "position:fixed;bottom:10px;left:10px;right:10px;background:#111;color:white;padding:15px;border:3px solid gold;border-radius:15px;z-index:99999;font-family:sans-serif;";
+  panel.innerHTML = `
+    <h2 style="margin:0 0 10px 0;color:gold;">🔧 ADMIN PANEL</h2>
+    <label>Münzen:</label><br>
+    <input id="adminCoins" type="number" value="9999" style="width:100%;padding:10px;font-size:18px;margin-bottom:10px;"><br>
+    <label>Kisten:</label><br>
+    <input id="adminCrates" type="number" value="10" style="width:100%;padding:10px;font-size:18px;margin-bottom:10px;"><br>
+    <label>Auto (Name):</label><br>
+    <input id="adminCar" type="text" value="Sportwagen" style="width:100%;padding:10px;font-size:18px;margin-bottom:10px;"><br>
+    <button id="adminGiveBtn" style="width:100%;padding:15px;background:gold;color:black;font-size:20px;font-weight:bold;border:none;border-radius:10px;">ALLES GEBEN ✅</button>
+    <p id="adminMsg" style="text-align:center;"></p>
+  `;
+  document.body.appendChild(panel);
+
+  document.getElementById("adminGiveBtn").onclick = function() {
+    let coins = document.getElementById("adminCoins").value;
+    let crates = document.getElementById("adminCrates").value;
+    let car = document.getElementById("adminCar").value;
+
+    // Versucht alle möglichen Speicher-Namen
+    localStorage.setItem("coins", coins);
+    localStorage.setItem("münzen", coins);
+    localStorage.setItem("geld", coins);
+    localStorage.setItem("money", coins);
+    localStorage.setItem("crates", crates);
+    localStorage.setItem("kisten", crates);
+    localStorage.setItem("boxes", crates);
+
+    // Auto speichern
+    let garage = JSON.parse(localStorage.getItem("garage") || localStorage.getItem("cars") || localStorage.getItem("autos") || "[]");
+    if (!garage.includes(car)) garage.push(car);
+    localStorage.setItem("garage", JSON.stringify(garage));
+    localStorage.setItem("cars", JSON.stringify(garage));
+    localStorage.setItem("autos", JSON.stringify(garage));
+
+    document.getElementById("adminMsg").innerText = "Geschafft! " + coins + " Münzen, " + crates + " Kisten, Auto: " + car + " ✅ Seite lädt neu...";
+    setTimeout(function(){ location.reload(); }, 1000);
+  };
+}
 </body>
 </html>
